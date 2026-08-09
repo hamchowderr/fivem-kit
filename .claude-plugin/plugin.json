@@ -11,6 +11,32 @@
   "homepage": "https://myrp.build",
   "repository": "https://github.com/hamchowderr/fivem-kit",
   "license": "MIT",
+  "userConfig": {
+    "default_dialect": {
+      "type": "string",
+      "title": "Preferred framework",
+      "description": "Which dialect to write for greenfield work, when no server is detected. One of: ox, esx, qbcore, qbox, standalone. A detected server always wins over this.",
+      "default": "ox"
+    },
+    "default_server_path": {
+      "type": "directory",
+      "title": "Default server folder",
+      "description": "The folder containing resources/, used when the current project has no detected server. Leave empty if you run more than one server — /fivem:init records the path per project instead.",
+      "required": false
+    },
+    "audit_on_write": {
+      "type": "boolean",
+      "title": "Audit Lua on write",
+      "description": "Lint resource Lua for security defects immediately after Claude writes it. Only CRITICAL and HIGH findings are surfaced.",
+      "default": true
+    },
+    "beads": {
+      "type": "string",
+      "title": "File findings as beads issues",
+      "description": "auto (only when the bd CLI and a beads database are both present), on, or off. Audit findings become tracked issues rather than chat output.",
+      "default": "auto"
+    }
+  },
   "keywords": [
     "fivem",
     "fxserver",

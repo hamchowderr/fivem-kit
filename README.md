@@ -59,6 +59,7 @@ Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
 
 | Command | Does |
 |---|---|
+| `/fivem:init [path]` | Detect your stack once and record it, so every other command speaks the right dialect |
 | `/fivem:resource <name>` | Scaffold a resource matched to your server's framework — manifest, client, server, config, with server-side validation written in from the start |
 | `/fivem:audit [path]` | Security audit against a 15-rule FiveM-specific ruleset |
 | `/fivem:doctor [path]` | Server health check — stack, load order, dependencies, manifests, cfg traps |
@@ -78,6 +79,26 @@ Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
 ### MCP tools (any editor)
 
 `fivemDocs` · `fivemSearch` · `fivemNatives` · `fivemAudit` · `fivemDetectStack`
+
+### Configuration
+
+Run `/fivem:init` once per project. It writes `.claude/fivem.local.md` — the detected server
+path, dialect, framework and lib, plus per-project switches (`audit_on_write`,
+`remind_on_stop`, `redact_secrets`, `lsp`, `beads`). Add `.claude/*.local.md` to your
+`.gitignore`; init offers to do it. `enabled: false` stands the plugin's automation down for
+one project without uninstalling it.
+
+Machine-wide preferences — preferred dialect for greenfield work, a default server folder,
+audit-on-write, beads filing — are prompted for when you enable the plugin and live in your
+user settings, reachable again via `/plugin`. Where both set the same thing, the project file
+wins, because it describes *that* server.
+
+**The project file is treated as untrusted input.** It lives in the workspace, so a cloned
+FiveM repo can ship one and the plugin's hooks read it every session. Every value is
+validated against an allow-list, `server_path` must resolve to a real directory containing
+`resources/`, unknown keys are dropped, and nothing from it is ever interpolated into a shell
+command. A committed config can't do harm — but it won't work on anyone else's machine
+either, which is the intended outcome.
 
 ---
 

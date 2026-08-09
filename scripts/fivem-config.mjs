@@ -64,6 +64,53 @@ const SAFE_IDENTIFIER = /^[A-Za-z0-9_.-]{1,64}$/;
 const TRUE_VALUES = new Set(['true', 'yes', 'on', '1']);
 const FALSE_VALUES = new Set(['false', 'no', 'off', '0']);
 
+const SEVERITIES = ['critical', 'high', 'medium', 'low'];
+
+/** The only keys this file understands, and the camelCase name each resolves to. */
+const FIELD_TO_CONFIG_KEY = Object.freeze({
+  enabled: 'enabled',
+  server_path: 'serverPath',
+  dialect: 'dialect',
+  framework: 'framework',
+  lib: 'lib',
+  audit_on_write: 'auditOnWrite',
+  remind_on_stop: 'remindOnStop',
+  redact_secrets: 'redactSecrets',
+  lsp: 'lsp',
+  beads: 'beads',
+  beads_min_severity: 'beadsMinSeverity',
+});
+
+/** Values used when nothing sets a field. Chosen so an unconfigured plugin is quiet and safe. */
+export const DEFAULTS = Object.freeze({
+  enabled: true,
+  serverPath: null,
+  dialect: null,
+  framework: null,
+  lib: null,
+  auditOnWrite: true,
+  remindOnStop: true,
+  redactSecrets: true,
+  lsp: false,
+  beads: 'auto',
+  beadsMinSeverity: 'high',
+});
+
+/**
+ * `userConfig` options declared in the plugin manifest, and the field each one backs.
+ *
+ * These arrive as `CLAUDE_PLUGIN_OPTION_<KEY>` environment variables. They come from *user*
+ * settings, which a cloned repository cannot write, so they are better-trusted than the
+ * project file — but they are still validated through exactly the same rules, because a
+ * typo should degrade to a default rather than propagate.
+ */
+export const USER_OPTIONS = Object.freeze({
+  CLAUDE_PLUGIN_OPTION_DEFAULT_DIALECT: 'dialect',
+  CLAUDE_PLUGIN_OPTION_DEFAULT_SERVER_PATH: 'server_path',
+  CLAUDE_PLUGIN_OPTION_AUDIT_ON_WRITE: 'audit_on_write',
+  CLAUDE_PLUGIN_OPTION_BEADS: 'beads',
+});
+
 export function configPath(projectDir = process.cwd()) {
   return path.join(projectDir, CONFIG_DIR, CONFIG_FILENAME);
 }
@@ -205,60 +252,51 @@ export function validateServerPath(value, warnings = [], { checkExists = true } 
 /**
  * Validate raw key/value pairs into a typed, trusted config.
  * Unknown keys are dropped rather than passed through.
+ *
+ * @returns {{config: object, warnings: string[], provided: Set<string>}} `provided` holds the
+ *   camelCase names that the input actually set, so a caller layering several sources can tell
+ *   "explicitly set" apart from "fell back to the default".
  */
 export function validate(pairs, { checkExists = true } = {}) {
   const warnings = [];
   const map = pairs instanceof Map ? pairs : new Map(Object.entries(pairs ?? {}));
 
-  const known = new Set([
-    'enabled',
-    'server_path',
-    'dialect',
-    'framework',
-    'lib',
-    'audit_on_write',
-    'remind_on_stop',
-    'redact_secrets',
-    'lsp',
-    'beads',
-    'beads_min_severity',
-  ]);
   for (const key of map.keys()) {
-    if (!known.has(key)) warnings.push(`unknown key "${key}" ignored`);
+    if (!Object.hasOwn(FIELD_TO_CONFIG_KEY, key)) warnings.push(`unknown key "${key}" ignored`);
   }
 
-  const has = (k) => map.has(k) && map.get(k) !== '';
+  const provided = new Set();
+  const has = (k) => {
+    const present = map.has(k) && map.get(k) !== '';
+    if (present) provided.add(FIELD_TO_CONFIG_KEY[k]);
+    return present;
+  };
+  const bool = (k) => asBoolean(map.get(k), k, warnings, DEFAULTS[FIELD_TO_CONFIG_KEY[k]]);
 
   const config = {
-    enabled: has('enabled') ? asBoolean(map.get('enabled'), 'enabled', warnings, true) : true,
+    enabled: has('enabled') ? bool('enabled') : DEFAULTS.enabled,
     serverPath: has('server_path')
       ? validateServerPath(map.get('server_path'), warnings, { checkExists })
-      : null,
-    dialect: has('dialect') ? asEnum(map.get('dialect'), DIALECTS, 'dialect', warnings) : null,
-    framework: has('framework') ? asIdentifier(map.get('framework'), 'framework', warnings) : null,
-    lib: has('lib') ? asIdentifier(map.get('lib'), 'lib', warnings) : null,
-    auditOnWrite: has('audit_on_write')
-      ? asBoolean(map.get('audit_on_write'), 'audit_on_write', warnings, true)
-      : true,
-    remindOnStop: has('remind_on_stop')
-      ? asBoolean(map.get('remind_on_stop'), 'remind_on_stop', warnings, true)
-      : true,
-    redactSecrets: has('redact_secrets')
-      ? asBoolean(map.get('redact_secrets'), 'redact_secrets', warnings, true)
-      : true,
-    lsp: has('lsp') ? asBoolean(map.get('lsp'), 'lsp', warnings, false) : false,
-    beads: has('beads') ? (asEnum(map.get('beads'), BEADS_MODES, 'beads', warnings) ?? 'auto') : 'auto',
+      : DEFAULTS.serverPath,
+    dialect: has('dialect') ? asEnum(map.get('dialect'), DIALECTS, 'dialect', warnings) : DEFAULTS.dialect,
+    framework: has('framework')
+      ? asIdentifier(map.get('framework'), 'framework', warnings)
+      : DEFAULTS.framework,
+    lib: has('lib') ? asIdentifier(map.get('lib'), 'lib', warnings) : DEFAULTS.lib,
+    auditOnWrite: has('audit_on_write') ? bool('audit_on_write') : DEFAULTS.auditOnWrite,
+    remindOnStop: has('remind_on_stop') ? bool('remind_on_stop') : DEFAULTS.remindOnStop,
+    redactSecrets: has('redact_secrets') ? bool('redact_secrets') : DEFAULTS.redactSecrets,
+    lsp: has('lsp') ? bool('lsp') : DEFAULTS.lsp,
+    beads: has('beads')
+      ? (asEnum(map.get('beads'), BEADS_MODES, 'beads', warnings) ?? DEFAULTS.beads)
+      : DEFAULTS.beads,
     beadsMinSeverity: has('beads_min_severity')
-      ? (asEnum(
-          map.get('beads_min_severity'),
-          ['critical', 'high', 'medium', 'low'],
-          'beads_min_severity',
-          warnings
-        ) ?? 'high')
-      : 'high',
+      ? (asEnum(map.get('beads_min_severity'), SEVERITIES, 'beads_min_severity', warnings) ??
+        DEFAULTS.beadsMinSeverity)
+      : DEFAULTS.beadsMinSeverity,
   };
 
-  return { config, warnings };
+  return { config, warnings, provided };
 }
 
 /**
@@ -270,7 +308,14 @@ export function validate(pairs, { checkExists = true } = {}) {
  */
 export function readConfig(projectDir = process.cwd(), opts = {}) {
   const file = configPath(projectDir);
-  const result = { ok: false, found: false, config: null, warnings: [], path: file };
+  const result = {
+    ok: false,
+    found: false,
+    config: null,
+    warnings: [],
+    path: file,
+    provided: new Set(),
+  };
 
   let stat;
   try {
@@ -304,11 +349,77 @@ export function readConfig(projectDir = process.cwd(), opts = {}) {
   }
 
   const pairs = parseFlatPairs(block, result.warnings);
-  const { config, warnings } = validate(pairs, opts);
+  const { config, warnings, provided } = validate(pairs, opts);
   result.warnings.push(...warnings);
   result.config = config;
+  result.provided = provided;
   result.ok = config.enabled;
   return result;
+}
+
+/**
+ * Read the plugin's `userConfig` options out of the environment.
+ *
+ * Claude Code exports each declared option as `CLAUDE_PLUGIN_OPTION_<KEY>` to hook processes.
+ * These live in *user* settings, which a cloned repository cannot write, so they are the safe
+ * place for a machine-wide default server path — but they still go through `validate()`, so a
+ * bad value degrades to a default instead of reaching a consumer.
+ *
+ * @returns {{options: object, warnings: string[]}} `options` holds only the fields the
+ *   environment actually set, already validated. Invalid values are absent, not null.
+ */
+export function readUserOptions(env = process.env, opts = {}) {
+  const pairs = new Map();
+  for (const [envKey, field] of Object.entries(USER_OPTIONS)) {
+    const raw = env?.[envKey];
+    if (raw === undefined || String(raw).trim() === '') continue;
+    pairs.set(field, unquote(String(raw)));
+  }
+  const { config, warnings, provided } = validate(pairs, opts);
+
+  const options = {};
+  for (const key of provided) {
+    if (config[key] !== null && config[key] !== undefined) options[key] = config[key];
+  }
+  return { options, warnings };
+}
+
+/**
+ * Layer the two configuration sources into the single object every consumer should use.
+ *
+ * Precedence, lowest to highest: built-in defaults → user `userConfig` options → the project
+ * file. The project file wins on value because it describes *this* server; user options are
+ * the machine-wide fallback for anyone who only runs one.
+ *
+ * **Activation stays project-scoped.** `ok` is true only when the project file exists, parses
+ * and is enabled. A user option can supply a value but can never switch the plugin on, so an
+ * unrelated repository never pays for a hook.
+ *
+ * @returns {{ok: boolean, found: boolean, config: object, warnings: string[], path: string,
+ *            sources: {file: boolean, user: string[]}}}
+ */
+export function resolveConfig({ projectDir = process.cwd(), env = process.env, ...opts } = {}) {
+  const file = readConfig(projectDir, opts);
+  const user = readUserOptions(env, opts);
+
+  const config = { ...DEFAULTS, ...user.options };
+  if (file.config) {
+    for (const key of file.provided) {
+      const value = file.config[key];
+      if (value !== null && value !== undefined) config[key] = value;
+    }
+    // `enabled` is the one field where an explicit false must survive the layering.
+    config.enabled = file.config.enabled;
+  }
+
+  return {
+    ok: file.ok,
+    found: file.found,
+    config,
+    warnings: [...user.warnings, ...file.warnings],
+    path: file.path,
+    sources: { file: file.found, user: Object.keys(user.options) },
+  };
 }
 
 /** Serialise a config to the file's markdown form. Only known keys are written. */
@@ -337,7 +448,12 @@ export function renderConfig(values = {}) {
   const lines = ['---'];
   for (const key of order) {
     if (v[key] === undefined || v[key] === null || v[key] === '') continue;
-    const val = typeof v[key] === 'boolean' ? String(v[key]) : `"${String(v[key]).replace(/"/g, '')}"`;
+    // Single quotes, deliberately: a Windows path is full of backslashes, and inside a
+    // DOUBLE-quoted YAML scalar `C:\Users` is an invalid escape sequence. Single-quoted YAML
+    // has no escapes, so the path survives verbatim in any parser, not just ours. Quote
+    // characters are stripped rather than escaped — `validateServerPath` rejects them anyway.
+    const val =
+      typeof v[key] === 'boolean' ? String(v[key]) : `'${String(v[key]).replace(/['"]/g, '')}'`;
     lines.push(`${key}: ${val}`);
   }
   lines.push('---', '');

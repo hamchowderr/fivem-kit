@@ -203,6 +203,27 @@ describe('file parsing', () => {
   });
 });
 
+describe('rendered frontmatter is valid YAML', () => {
+  test('a Windows path is single-quoted, never double-quoted', () => {
+    const out = renderConfig({ dialect: 'ox', server_path: 'C:\\Users\\dev\\FXServer\\server-data' });
+    // In a DOUBLE-quoted YAML scalar a backslash starts an escape, so `C:\Users` is invalid
+    // and `\U` specifically demands 8 hex digits. Single-quoted scalars have no escapes.
+    assert.ok(!/:\s*"[^"\n]*\\/.test(out), 'must not emit a backslash inside double quotes');
+    assert.ok(out.includes("server_path: 'C:\\Users\\dev\\FXServer\\server-data'"));
+  });
+
+  test('booleans are unquoted so they stay booleans', () => {
+    const out = renderConfig({ dialect: 'ox' });
+    assert.ok(out.includes('enabled: true'));
+    assert.ok(out.includes('lsp: false'));
+  });
+
+  test('a value carrying a quote character has it stripped, not escaped', () => {
+    const out = renderConfig({ framework: "ox'core" });
+    assert.ok(out.includes("framework: 'oxcore'"));
+  });
+});
+
 describe('the module never builds a shell command', () => {
   test('source contains no exec/spawn/shell construction', () => {
     const src = fs.readFileSync(new URL('../../scripts/fivem-config.mjs', import.meta.url), 'utf8');
