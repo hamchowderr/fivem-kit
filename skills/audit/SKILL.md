@@ -1,6 +1,13 @@
 ---
-description: Audit FiveM resources for exploitable security flaws
-argument-hint: [resource path, or blank for the whole server]
+name: audit
+description: >
+  Security-audit FiveM Lua for exploitable server-side defects — unvalidated net events,
+  client-supplied prices, missing distance checks, SQL injection, unguarded admin commands,
+  secrets committed into client scripts, and money-duplication races. Use when the user says
+  "audit this", "is this secure", "check my resource", "review this script", and proactively
+  after writing or modifying any server-side handler. Not for performance review (use the
+  perf lens) or for non-FiveM Lua.
+argument-hint: "[resource path, or blank for the whole server]"
 allowed-tools: Bash, Read, Glob, Grep
 ---
 

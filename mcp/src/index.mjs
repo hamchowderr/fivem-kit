@@ -42,7 +42,7 @@ async function loadDetector() {
 const text = (s) => ({ content: [{ type: 'text', text: s }] });
 const json = (o) => text(JSON.stringify(o, null, 2));
 
-const server = new McpServer({ name: 'fivem-kit', version: PKG.version });
+const server = new McpServer({ name: PKG.name, version: PKG.version });
 
 /* ------------------------------------------------------------------ docs ---- */
 

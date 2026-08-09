@@ -53,6 +53,30 @@ describe('name conversion (no network needed)', () => {
   });
 });
 
+describe('cache location is harness-neutral', () => {
+  test('FIVEM_CACHE_DIR overrides the OS default', async () => {
+    const src = await import('node:fs').then(() =>
+      import('node:fs').then((fs) => fs.readFileSync(new URL('../src/natives.mjs', import.meta.url), 'utf8'))
+    );
+    assert.match(src, /process\.env\.FIVEM_CACHE_DIR/, 'must honour FIVEM_CACHE_DIR');
+    assert.match(src, /LOCALAPPDATA|XDG_CACHE_HOME/, 'must fall back to the OS cache dir');
+  });
+
+  test('no harness-specific env var is read', async () => {
+    const fs = await import('node:fs');
+    const dir = new URL('../src/', import.meta.url);
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith('.mjs')) continue;
+      const src = fs.readFileSync(new URL(f, dir), 'utf8');
+      assert.doesNotMatch(
+        src,
+        /process\.env\.CLAUDE_\w+/,
+        `${f} reads a Claude-specific env var; this server also ships to Cursor/Windsurf/Zed`
+      );
+    }
+  });
+});
+
 describe('database lookups', { skip: available ? false : 'natives database unavailable' }, () => {
   test('indexes both GTA and CFX sources', () => {
     assert.ok(index.list.length > 6000, `expected >6000 natives, got ${index.list.length}`);

@@ -1,6 +1,12 @@
 ---
-description: Look up FiveM natives and the ox wrapper to prefer
-argument-hint: <native name or what you want to do>
+name: natives
+description: >
+  Look up any of ~7,300 GTA V and CFX/FiveM natives by name, hash, or a description of the
+  task, and get the exact signature with parameter types plus the ox_lib wrapper to prefer.
+  Use whenever a native call is about to be written and its argument order or return type
+  is not certain — "what's the native for", "how do I spawn/freeze/attach", or any
+  unfamiliar native name. Distinguishes client natives from their server RPC equivalents.
+argument-hint: "<native name, hash, or what you want to do>"
 allowed-tools: Read, Grep, WebFetch
 ---
 

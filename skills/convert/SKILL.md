@@ -1,6 +1,12 @@
 ---
-description: Convert an ESX or QBCore resource to the ox stack
-argument-hint: <resource path>
+name: convert
+description: >
+  Migrate an ESX or QBCore resource to the ox stack — oxmysql, lib.callback, ox_lib UI,
+  ox_target, ox_inventory, ox_core — in a staged order that is reversible until the data
+  migrations. Use when the user says "convert this to ox", "migrate from ESX/QBCore",
+  "port this resource", or "modernise this script". Flags what it cannot safely do
+  (item definitions, money mapping) instead of guessing.
+argument-hint: "<resource path>"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 

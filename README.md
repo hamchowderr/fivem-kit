@@ -29,13 +29,13 @@ It also does two things a docs bundle can't:
 
 ```
 /plugin marketplace add hamchowderr/fivem-kit
-/plugin install fivem-kit
+/plugin install fivem
 ```
 
 ### Any other MCP editor (docs + audit + detection)
 
 ```bash
-npx -y fivem-kit-mcp
+npx -y fivem-mcp
 ```
 
 Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
@@ -45,7 +45,7 @@ Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
   "mcpServers": {
     "fivem-kit": {
       "command": "npx",
-      "args": ["-y", "fivem-kit-mcp@latest"]
+      "args": ["-y", "fivem-mcp@latest"]
     }
   }
 }
@@ -161,7 +161,7 @@ The database is **fetched from the official CitizenFX endpoint on first use and 
 locally** (30-day TTL), not bundled. Two reasons: the CitizenFX natives repositories
 publish no license, so redistributing the data in an npm package would be legally
 ambiguous; and the database tracks game builds, so a bundled copy goes stale. Set
-`FIVEM_KIT_CACHE` to control the cache location. Everything else in fivem-kit works
+`FIVEM_CACHE_DIR` to control the cache location. Everything else in fivem-kit works
 offline.
 
 ## Requirements

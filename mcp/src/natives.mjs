@@ -27,13 +27,20 @@ const SOURCES = [
 
 const TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
+/**
+ * Cache location. Deliberately harness-neutral: one plain env escape hatch, then the
+ * OS-standard cache directory. This server is published for Cursor, Windsurf, Zed and
+ * Claude Desktop as well as Claude Code, so it must not branch on any one harness. No
+ * harness-specific environment variable is read anywhere in this package, by design; a
+ * host that wants a particular location sets FIVEM_CACHE_DIR when launching the server.
+ */
 function cacheDir() {
-  if (process.env.FIVEM_KIT_CACHE) return process.env.FIVEM_KIT_CACHE;
+  if (process.env.FIVEM_CACHE_DIR) return process.env.FIVEM_CACHE_DIR;
   const base =
     process.platform === 'win32'
       ? process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local')
       : process.env.XDG_CACHE_HOME || path.join(os.homedir(), '.cache');
-  return path.join(base, 'fivem-kit');
+  return path.join(base, 'fivem-mcp');
 }
 
 function cachePath(key) {

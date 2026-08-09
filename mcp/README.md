@@ -1,4 +1,4 @@
-# fivem-kit-mcp
+# fivem-mcp
 
 An MCP server that gives any AI editor accurate FiveM knowledge — instead of a plausible
 guess at an API that doesn't exist.
@@ -15,20 +15,20 @@ speaks MCP.
 ## Install
 
 ```bash
-npx -y fivem-kit-mcp
+npx -y fivem-mcp
 ```
 
 ### Claude Code
 
 ```bash
-claude mcp add fivem-kit -- npx -y fivem-kit-mcp@latest
+claude mcp add fivem -- npx -y fivem-mcp@latest
 ```
 
 Or install the full plugin, which bundles this server plus skills and slash commands:
 
 ```
 /plugin marketplace add hamchowderr/fivem-kit
-/plugin install fivem-kit
+/plugin install fivem
 ```
 
 ### Cursor / Windsurf / Claude Desktop / VS Code
@@ -41,7 +41,7 @@ shape is the same):
   "mcpServers": {
     "fivem-kit": {
       "command": "npx",
-      "args": ["-y", "fivem-kit-mcp@latest"]
+      "args": ["-y", "fivem-mcp@latest"]
     }
   }
 }
@@ -80,7 +80,7 @@ wrapper where one exists.
 
 Fetched from `runtime.fivem.net` on first use and cached for 30 days under
 `$LOCALAPPDATA/fivem-kit` or `$XDG_CACHE_HOME/fivem-kit`; override with
-`FIVEM_KIT_CACHE`. Not bundled: the CitizenFX natives repositories publish no license, and
+`FIVEM_CACHE_DIR`. Not bundled: the CitizenFX natives repositories publish no license, and
 the database tracks game builds so a bundled copy would go stale.
 
 ### `fivemDetectStack`

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "fivem-kit": {
+    "fivem": {
       "command": "npx",
-      "args": ["-y", "fivem-kit-mcp@latest"]
+      "args": ["-y", "fivem-mcp@latest"]
     }
   }
 }

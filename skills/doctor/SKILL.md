@@ -1,6 +1,12 @@
 ---
-description: Health-check a FiveM server — stack, load order, dependencies, manifests
-argument-hint: [server path]
+name: doctor
+description: >
+  Health-check a FiveM server — detected framework, resource load order against declared
+  dependencies, fxmanifest defects, and server.cfg traps such as the semicolon FiveM splits
+  on. Use when the user says "check my server", "why won't this resource start", "something
+  is broken", "health check", or reports a resource failing to load. Read-only; it reports
+  and never edits the cfg or restarts anything.
+argument-hint: "[server path]"
 allowed-tools: Bash, Read, Glob, Grep
 ---
 

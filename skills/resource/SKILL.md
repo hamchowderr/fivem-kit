@@ -1,6 +1,12 @@
 ---
-description: Scaffold a new FiveM resource matched to the server's actual framework
-argument-hint: <resource name> [what it should do]
+name: resource
+description: >
+  Scaffold a new FiveM resource matched to the server's actual framework — fxmanifest,
+  client, server, config, and locales — with server-side validation written in from the
+  start rather than bolted on. Use when the user says "make a resource", "create a script",
+  "build me a job/shop/garage", or describes FiveM functionality they want to exist.
+  Detects the server's dialect first and writes ox, ESX, QBCore or Qbox accordingly.
+argument-hint: "<resource name> [what it should do]"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 
