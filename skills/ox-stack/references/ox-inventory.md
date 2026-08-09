@@ -92,7 +92,22 @@ exports.ox_inventory:RegisterShop(shopType, shopDetails)
 ```lua
 exports.ox_inventory:Items(item)      -- definition(s)
 exports.ox_inventory:ItemList(item)   -- alias
+exports.ox_inventory:ConvertItems()   -- migrate item data from another framework
 ```
+
+## Opening and using (server)
+
+```lua
+exports.ox_inventory:forceOpenInventory(source, invType, data)
+exports.ox_inventory:useItem(source, itemName, data, cb)
+exports.ox_inventory:useSlot(source, slot)
+exports.ox_inventory:giveItemToTarget(source, slot, target, count)
+exports.ox_inventory:GetItemSlots(inv, item, metadata, strict)
+exports.ox_inventory:setContainerProperties(inv, properties)
+```
+
+`forceOpenInventory` opens an inventory the player did not request — use it for police
+searches and admin inspection, and gate it on a server-side permission check.
 
 ## Hooks (server)
 
@@ -123,6 +138,12 @@ exports.ox_inventory:Items(item)
 exports.ox_inventory:ItemList(item)
 exports.ox_inventory:displayMetadata(metadata, value)
 exports.ox_inventory:weaponWheel(state)
+exports.ox_inventory:GetCurrentWeapon()
+exports.ox_inventory:openInventory(invType, data)
+exports.ox_inventory:closeInventory()
+exports.ox_inventory:openNearbyInventory()
+exports.ox_inventory:setStashTarget(id, owner)
+exports.ox_inventory:suppressItemNotifications(state)
 ```
 
 > Client inventory reads are for **display only**. A client reporting it holds an item is

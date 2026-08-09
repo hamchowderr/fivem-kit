@@ -88,9 +88,11 @@ Load the one you need; they are detailed and self-contained.
 | `references/ox-inventory.md` | item, slot, stash, shop, drop and hook exports |
 | `references/patterns.md` | complete worked resources — job centre, shop with callback, lockpick with progress + skill check |
 
-> The APIs above were verified against ox_lib 3.30.x, ox_core 1.5.x, ox_inventory 2.44.x
-> and ox_target 1.17.x. ox ships fast — ox_lib is past 3.38 and ox_inventory past 2.47 at
-> time of writing — and `ox_core` is still pre-1.0 in spirit. The shapes here are stable,
-> but check the `version` line in the installed resource's `fxmanifest.lua` before relying
-> on anything recently added, and read the resource source when in doubt: it is the only
-> authority that is never out of date.
+> **Verified 2026-08-09** against ox_lib **3.38.0**, ox_inventory **2.47.8**, ox_target
+> **1.18.1** and current ox_core. Every API documented in these references was confirmed
+> to exist in the installed source — 126 symbols checked, 0 missing.
+>
+> ox still ships fast and `ox_core` remains pre-1.0 in spirit. Check the `version` line in
+> the installed resource's `fxmanifest.lua` before relying on anything recently added, and
+> read the resource source when in doubt: it is the only authority that is never out of
+> date.

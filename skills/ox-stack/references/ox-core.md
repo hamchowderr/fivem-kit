@@ -58,6 +58,7 @@ Lookups:
 ```lua
 Ox.GetPlayer(playerId)
 Ox.GetPlayerFromUserId(userId)
+Ox.GetPlayerFromCharId(charId)     -- by character id
 Ox.GetPlayers(filter)              -- all, optional filter table
 Ox.GetPlayerFromFilter(filter)     -- first match
 ```
@@ -78,8 +79,11 @@ vehicle:getCoords()
 vehicle:getState()                 -- Entity(entity).state statebag
 
 Ox.GetVehicle(entityId)
+Ox.GetVehicleFromEntity(entityId)   -- by entity handle
 Ox.GetVehicleFromNetId(netId)
 Ox.GetVehicleFromVin(vin)
+Ox.GetVehicleFromFilter(filter)     -- first match
+Ox.GetVehicles(filter)              -- all, optional filter table
 
 Ox.CreateVehicle(data, coords, heading)   -- new vehicle
 Ox.SpawnVehicle(dbId, coords, heading)    -- existing, from the database

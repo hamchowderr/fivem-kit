@@ -249,12 +249,183 @@ end)
 
 ---
 
-## lib.getNearbyPlayers (client)
+## Proximity helpers
+
+Signatures differ between client and server — check which side you are on.
 
 ```lua
-local nearby = lib.getNearbyPlayers(coords, maxDistance, includePlayer)
--- { { id = serverId, ped = pedHandle, coords = vec3 }, ... }
+-- CLIENT
+lib.getClosestPlayer(coords, maxDistance, includePlayer)
+lib.getNearbyPlayers(coords, maxDistance, includePlayer)
+lib.getClosestPed(coords, maxDistance)
+lib.getNearbyPeds(coords, maxDistance)
+lib.getClosestVehicle(coords, maxDistance, includePlayerVehicle)
+lib.getNearbyVehicles(coords, maxDistance, includePlayerVehicle)
+lib.getClosestObject(coords, maxDistance)
+lib.getNearbyObjects(coords, maxDistance)
+
+-- SERVER  (note the third parameter changes meaning)
+lib.getClosestPlayer(coords, maxDistance, ignorePlayerId)
+lib.getNearbyPlayers(coords, maxDistance)
 ```
+
+`getNearby*` returns `{ { id, ped, coords }, ... }`; `getClosest*` returns the single
+nearest plus its distance.
+
+```lua
+lib.getRelativeCoords(coords, rotation, offset)   -- offset in an entity's local space
+```
+
+## lib.cache and lib.onCache (client)
+
+ox_lib maintains `cache.ped`, `cache.playerId`, `cache.serverId`, `cache.vehicle`,
+`cache.seat`, `cache.weapon`. Use these instead of calling the natives per tick.
+
+```lua
+lib.onCache('vehicle', function(vehicle)
+    -- fires when the player enters or leaves a vehicle; nil on exit
+end)
+
+lib.onCache('ped', function(ped) end)
+```
+
+This is the correct replacement for a per-frame `IsPedInAnyVehicle` poll.
+
+## Vehicle properties
+
+The standard way to persist and restore a vehicle's full appearance and tuning — the
+backbone of any garage script.
+
+```lua
+local props = lib.getVehicleProperties(vehicle)          -- client
+lib.setVehicleProperties(vehicle, props)                 -- client
+lib.setVehicleProperties(vehicle, props, fixVehicle)     -- optionally repair on apply
+```
+
+Store `props` as JSON in the database; do not try to reconstruct mods field by field.
+
+## ACE permissions (server)
+
+Relevant to command security — see the `fivem-security` skill, rule SEC-7.
+
+```lua
+lib.addAce(principal, ace, allow)
+lib.removeAce(principal, ace, allow)
+lib.addPrincipal(child, parent)
+lib.removePrincipal(child, parent)
+```
+
+These write the same permission state as `add_ace` / `add_principal` in `server.cfg`, but
+at runtime — useful for permissions derived from the database rather than hardcoded.
+
+## lib.points — point-based proximity (client)
+
+A lighter alternative to `lib.zones` when you only need distance from a coordinate.
+
+```lua
+local point = lib.points.new({
+    coords = vec3(100.0, 200.0, 30.0),
+    distance = 10.0,
+    onEnter = function(self) end,
+    onExit  = function(self) end,
+    nearby  = function(self) end,   -- runs while within `distance`
+})
+
+point:remove()
+
+lib.points.getAllPoints()
+lib.points.getClosestPoint()
+lib.points.getNearbyPoints()
+```
+
+Use `lib.points` for "is the player near this spot"; use `lib.zones` when you need real
+volumes (box, sphere, polygon) with enter/exit semantics.
+
+## Entity creation helpers
+
+Load the model, create the entity, and clean up — replacing the usual
+`RequestModel` + poll + `CreateVehicle` + `SetModelAsNoLongerNeeded` boilerplate.
+
+```lua
+lib.ped.create(model, x, y, z, heading)
+lib.ped.create(model, x, y, z, heading, isNetworked, bScriptHostPed)
+lib.prop.create(model, x, y, z, heading, dynamic)
+lib.vehicle.create(model, x, y, z, heading, isNetworked, netMissionEntity)
+```
+
+## More asset loaders (client)
+
+Same contract as `lib.requestModel` — await with a timeout instead of looping forever.
+
+```lua
+lib.requestAnimSet(animSet)
+lib.requestAudioBank(audioBank)
+lib.requestNamedPtfxAsset(ptfxName)
+lib.requestScaleformMovie(scaleformName)
+lib.requestStreamedTextureDict(textureDict)
+lib.requestWeaponAsset(weaponType)
+```
+
+## lib.cron — scheduled jobs (server)
+
+```lua
+lib.cron.new('*/5 * * * *', function(task, date)
+    -- every five minutes
+end, { debug = true })
+```
+
+Standard cron expressions. The right tool for payday, cleanup, and persistence flushes —
+better than a `SetTimeout` chain, which drifts.
+
+## lib.print — levelled logging
+
+```lua
+lib.print.error(...)
+lib.print.warn(...)
+lib.print.info(...)
+lib.print.debug(...)     -- only shown when the resource's debug convar is set
+lib.print.verbose(...)
+```
+
+Qbox uses this throughout. Prefer it over bare `print` — the level prefix and resource
+name make server console output readable.
+
+## lib.triggerClientEvent (server)
+
+```lua
+lib.triggerClientEvent(eventName, targetIds, ...)   -- targetIds: a table of server ids
+```
+
+Send to a specific set of players in one call. Reach for this instead of
+`TriggerClientEvent(..., -1, ...)` when only some players need the event — see SEC-12.
+
+## lib.checkDependency
+
+```lua
+if not lib.checkDependency('ox_inventory', '2.44.0', true) then return end
+```
+
+Verifies another resource is present and new enough, printing a clear message when it is
+not. Better than discovering the mismatch as a nil export at runtime.
+
+## Utility modules
+
+Available as `lib.<module>`; see the ox_lib docs for full method lists.
+
+| Module | Purpose |
+|---|---|
+| `lib.array` | array class with map/filter/reduce style helpers |
+| `lib.table` | table utilities including `table.wipe`, deep compare, merge |
+| `lib.string` | string helpers |
+| `lib.math` | numeric helpers including `math.groupdigits` |
+| `lib.class` | class/inheritance implementation ox uses internally |
+| `lib.set`, `lib.map`, `lib.heap`, `lib.lru`, `lib.ringbuffer` | data structures |
+| `lib.timer` | cancellable timers |
+| `lib.uuid` | `lib.uuid.generate()` / `lib.uuid.validate(str)` |
+| `lib.grid` | spatial grid used by zones/points |
+| `lib.dui` | offscreen browser surfaces (render NUI to a texture) |
+| `lib.hook` / `lib.registerHook` | intercept events from other resources |
+| `lib.logger` | `lib.logger(source, event, message, ...)` structured logging |
 
 ---
 

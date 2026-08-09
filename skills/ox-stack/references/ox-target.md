@@ -71,7 +71,17 @@ exports.ox_target:addGlobalVehicle({ --[[ options ]] })
 exports.ox_target:addGlobalObject({ --[[ options ]] })
 exports.ox_target:addGlobalPlayer({ --[[ options ]] })
 exports.ox_target:addGlobalOption({ --[[ options ]] })
+
+-- each has a remove counterpart, taking the option name(s) to remove
+exports.ox_target:removeGlobalPed('talk_ped')
+exports.ox_target:removeGlobalVehicle('check_vehicle')
+exports.ox_target:removeGlobalObject('inspect')
+exports.ox_target:removeGlobalPlayer('search')
+exports.ox_target:removeGlobalOption('my_option')
 ```
+
+Always remove what you add on `onResourceStop`, or the options survive a resource restart
+and stack up as duplicates.
 
 ## Utilities
 
