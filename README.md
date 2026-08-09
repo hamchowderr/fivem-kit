@@ -122,8 +122,19 @@ default, and flags it when it finds it in yours.
 | SEC-15 | NUI callback trusted |
 
 The analyser decides the mechanical ones itself and returns targeted review prompts for
-the ones that need judgement — it does not pad the report with guesses. Verified against
-real ox, QBCore and ESX sources at zero false positives.
+the ones that need judgement — it does not pad the report with guesses.
+
+**Tuned for precision against real code.** Sweeping 809 resource files from ox, ESX,
+QBCore, Qbox and the qb-scripts collection took the finding count from 79 to 16 by
+eliminating six classes of false positive — `lib.load()` read as `load()`, nested tables
+truncating a command config, an inner `end` cutting a loop scan short, `if source ~= 0`
+console guards, framework command wrappers with their own permission model, and SQL that
+interpolates a *column or table identifier* while still binding its values. What survives
+is genuine: qb-scripts really do still call the deprecated `MySQL.Async` API.
+
+An ungated command is only reported when its handler actually grants value or control —
+`/job` printing your own job is not a vulnerability, and reporting it would bury the ones
+that are. 29 regression tests lock every one of those distinctions in place.
 
 ---
 

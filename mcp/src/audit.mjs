@@ -9,12 +9,34 @@
  * Full rule descriptions: skills/fivem-security/SKILL.md
  */
 
-/** Strip Lua comments and string literals so patterns don't match inside them. */
-function stripNoise(src) {
+/** Blank a match, preserving length and newlines so line numbers stay correct. */
+const blank = (m) => m.replace(/[^\n]/g, ' ');
+
+/**
+ * Remove comments (long `--[[ ]]` first, then line comments) and long-bracket strings.
+ * Quoted string CONTENT is kept — some rules need it.
+ */
+function stripComments(src) {
   return src
-    .replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, (m) => m.replace(/[^\n]/g, ' '))
-    .replace(/--[^\n]*/g, (m) => ' '.repeat(m.length))
-    .replace(/\[(=*)\[[\s\S]*?\]\1\]/g, (m) => m.replace(/[^\n]/g, ' '));
+    .replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, blank)
+    .replace(/--[^\n]*/g, blank)
+    .replace(/\[(=*)\[[\s\S]*?\]\1\]/g, blank);
+}
+
+/**
+ * Blank the inside of quoted strings, keeping the quotes themselves.
+ *
+ * Without this, prose that merely mentions an API — an error message, a doc comment
+ * assigned to a variable, a locale entry — matches the code rules. Escaped quotes are
+ * honoured so `"he said \"hi\""` does not end early.
+ */
+function blankStringContents(src) {
+  return src.replace(/(['"])((?:\\.|[^\\\n])*?)\1/g, (m, q, body) => q + blank(body) + q);
+}
+
+/** Code-structure view: no comments, no string contents. */
+function stripNoise(src) {
+  return blankStringContents(stripComments(src));
 }
 
 function lineOf(src, index) {
@@ -89,11 +111,23 @@ export function detectSide(clean, filename = '') {
 const PERMISSION_CHECK =
   /IsPlayerAceAllowed|restricted|HasPermission|hasPermission|isAdmin|IsPlayerAdmin|source\s*[~=]=\s*0|src\s*[~=]=\s*0/i;
 
+/**
+ * Does this handler actually do something worth protecting?
+ *
+ * An unrestricted command is only a vulnerability if it grants value or control.
+ * qbx_core's `/job` prints the caller's own job and needs no gate; flagging it buries
+ * the real finding, which is the point of the whole ruleset.
+ */
+const PRIVILEGED_ACTION =
+  /SetMoney|AddMoney|RemoveMoney|:deposit|:withdraw|AddItem|RemoveItem|SetJob|setJob|SetGang|setGroup|set\s*\(\s*['"]job|SetEntityCoords|setCoords|DropPlayer|:kick|\bban\b|SpawnVehicle|CreateVehicle|AddPermission|RemovePermission|SetPlayerBucket|giveWeapon|GiveWeapon|SetSlotCount|SetMaxWeight|MySQL\.(update|insert|query)|RegisterStash|ConfiscateInventory/i;
+
 const RULES = [
   {
     id: 'SEC-5',
     severity: 'CRITICAL',
     title: 'SQL built by string concatenation',
+    // needs the query text intact: the `?` placeholders live inside the string literal
+    needsStrings: true,
     // a MySQL/oxmysql call whose query argument uses .. or :format
     test: (clean) => {
       const out = [];
@@ -101,19 +135,48 @@ const RULES = [
       let m;
       while ((m = re.exec(clean))) {
         const args = m[2];
-        if (/\.\.|:format\s*\(|%s|%d/.test(args)) out.push({ index: m.index });
+        const interpolated = /\.\.|:format\s*\(|%s|%d/.test(args);
+        if (!interpolated) continue;
+        // Interpolating an identifier (a column or table name) while still binding the
+        // VALUES with ? is the normal safe pattern — qbx_core's ban lookup does exactly
+        // this. Only flag when no placeholder is used at all.
+        if (args.includes('?')) continue;
+        // A backtick-wrapped placeholder is a table/column identifier, not a value —
+        // ox_inventory's schema migrations use `SHOW COLUMNS FROM \`%s\``. There is no
+        // value to bind in DDL, so the ? rule above cannot apply.
+        if (/`[^`\n]*(%s|\.\.)[^`\n]*`/.test(args)) continue;
+        out.push({ index: m.index });
       }
       return out;
     },
-    message: 'The query string is assembled from values instead of using ? placeholders.',
-    fix: "Use parameters: MySQL.single.await('SELECT ... WHERE x = ?', { x }).",
+    message: 'The query string is assembled from values with no ? placeholder anywhere.',
+    fix: "Bind values as parameters: MySQL.single.await('SELECT ... WHERE x = ?', { x }). Interpolating a column name is acceptable only when it comes from a server-side allow-list.",
   },
   {
     id: 'SEC-10',
     severity: 'CRITICAL',
     title: 'Dynamic code execution',
     // negative lookbehind so lib.load(), self:load(), myLoad() etc. do not match
-    test: (clean) => matchAll(clean, /(?<![.:\w])(?:loadstring|load)\s*\(/g),
+    test: (clean, withStrings) => {
+      const out = [];
+      // detect on the blanked view so a `load(` mentioned inside a string is ignored,
+      // but read the arguments from the string-preserving view at the same offsets
+      const re = /(?<![.:\w])(?:loadstring|load)\s*\(/g;
+      let m;
+      while ((m = re.exec(clean))) {
+        const argsEnd = clean.indexOf(')', m.index);
+        const args = withStrings.slice(m.index + m[0].length, argsEnd === -1 ? undefined : argsEnd);
+        // A deliberate module loader passes a chunk name, and often a mode string:
+        //   load(file, '@@res/file.lua', 't', env)        -- ox_lib's require
+        //   load(chunk, ('@@ox_lib/imports/%s'):format(m))
+        // The Lua convention is a chunkname beginning with '@'. A dangerous call is
+        // load(x) / loadstring(x) on a single value with no chunkname.
+        if (/,\s*(['"])[tb]{1,2}\1/.test(args)) continue;
+        if (/,\s*\(?\s*['"]@/.test(args)) continue;
+        out.push({ index: m.index });
+      }
+      return out;
+    },
     message: 'load/loadstring evaluates arbitrary code. If any part comes from a client, this is remote code execution.',
     fix: 'Remove it. Allow-list behaviour instead of evaluating strings.',
   },
@@ -122,7 +185,7 @@ const RULES = [
     severity: 'HIGH',
     title: 'Command registered with no permission gate',
     serverOnly: true,
-    test: (clean) => {
+    test: (clean, withStrings) => {
       const out = [];
       // lib.addCommand — read the whole config table, nested tables included
       const re = /lib\.addCommand\s*\(\s*(['"])(.+?)\1\s*,/g;
@@ -130,17 +193,22 @@ const RULES = [
       while ((m = re.exec(clean))) {
         const cfg = balancedBraces(clean, m.index + m[0].length);
         if (cfg === null) continue;
-        if (!/restricted\s*=/.test(cfg) || /restricted\s*=\s*false\b/.test(cfg)) {
-          out.push({ index: m.index, extra: m[2] });
-        }
+        const gated = /restricted\s*=/.test(cfg) && !/restricted\s*=\s*false\b/.test(cfg);
+        if (gated) continue;
+        // only a finding if the handler actually grants value or control
+        const at = m.index + m[0].length + cfg.length;
+        if (!PRIVILEGED_ACTION.test(luaBlock(withStrings, at, 2000))) continue;
+        out.push({ index: m.index, extra: m[2] });
       }
-      // raw RegisterCommand — scan the real handler body for a permission check
-      const re2 = /RegisterCommand\s*\(\s*(['"])(.+?)\1\s*,/g;
+      // raw RegisterCommand — scan the real handler body for a permission check.
+      // The lookbehind excludes framework wrappers with their own permission model,
+      // e.g. ESX.RegisterCommand('setjob', 'admin', fn) takes the group as argument 2.
+      const re2 = /(?<![.:\w])RegisterCommand\s*\(\s*(['"])(.+?)\1\s*,/g;
       while ((m = re2.exec(clean))) {
-        const body = luaBlock(clean, m.index + m[0].length, 2000);
-        if (!PERMISSION_CHECK.test(body)) {
-          out.push({ index: m.index, extra: m[2] });
-        }
+        const at = m.index + m[0].length;
+        if (PERMISSION_CHECK.test(luaBlock(clean, at, 2000))) continue;
+        if (!PRIVILEGED_ACTION.test(luaBlock(withStrings, at, 2000))) continue;
+        out.push({ index: m.index, extra: m[2] });
       }
       return out;
     },
@@ -202,7 +270,11 @@ const RULES = [
       while ((m = re.exec(clean))) {
         // scan the real loop body, not up to the first inner `end`
         const body = luaBlock(clean, m.index + m[0].length);
-        if (!/\bWait\s*\(|Citizen\.Wait\s*\(/.test(body)) out.push({ index: m.index });
+        if (/\bWait\s*\(|Citizen\.Wait\s*\(/.test(body)) continue;
+        // `while true do ... break/return` is an ordinary synchronous algorithm loop
+        // (ox_lib's heap sift, for instance), not a tick loop that hangs the game.
+        if (/\bbreak\b|\breturn\b|\bgoto\b/.test(body)) continue;
+        out.push({ index: m.index });
       }
       return out;
     },
@@ -221,6 +293,8 @@ const RULES = [
     id: 'SEC-8',
     severity: 'CRITICAL',
     title: 'Possible secret in source',
+    // secrets live INSIDE string literals, so this rule reads the string-preserving view
+    needsStrings: true,
     test: (clean) => {
       const out = [];
       const pats = [
@@ -253,7 +327,8 @@ function matchAll(text, re) {
  * @param {string} [filename] for reporting
  */
 export function auditLua(source, filename = 'input.lua') {
-  const clean = stripNoise(source);
+  const withStrings = stripComments(source); // comments gone, string contents kept
+  const clean = blankStringContents(withStrings); // code structure only
   const side = detectSide(clean, filename);
   const findings = [];
 
@@ -261,7 +336,10 @@ export function auditLua(source, filename = 'input.lua') {
     // server-only rules don't apply to client scripts (a client RegisterCommand
     // has no ACE implication, and a client cannot broadcast)
     if (rule.serverOnly && side === 'client') continue;
-    for (const hit of rule.test(clean)) {
+    // Both views are the same length with the same character positions, so indices
+    // taken from one are valid in the other. Rules that need literal text (a `?`
+    // placeholder, a quoted key) read the second argument.
+    for (const hit of rule.test(rule.needsStrings ? withStrings : clean, withStrings)) {
       const line = lineOf(clean, hit.index);
       findings.push({
         rule: rule.id,
