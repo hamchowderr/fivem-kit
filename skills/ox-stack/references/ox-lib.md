@@ -408,6 +408,100 @@ if not lib.checkDependency('ox_inventory', '2.44.0', true) then return end
 Verifies another resource is present and new enough, printing a clear message when it is
 not. Better than discovering the mismatch as a nil export at runtime.
 
+## GameEntity — the statebag interface behind Ped / Player / Prop / Vehicle
+
+`lib.ped`, `lib.player`, `lib.prop` and `lib.vehicle` all inherit from an internal
+GameEntity class. Its methods are where entity state actually lives, and they are the
+clean alternative to hand-rolled `Entity(e).state` access.
+
+> This page is **absent from the ox docs sidebar and from `llms.txt`** — it appears only
+> in `llms-full.txt`. Crawling the navigation misses it entirely, which is why it is
+> easily the least-known part of ox_lib.
+
+```lua
+entity:set(key, value)     -- write to the entity's statebag (local)
+entity:setr(key, value)    -- write REPLICATED — synced to server and relevant players
+entity:sets(key, value)    -- write, synced
+entity:get(key)            -- read
+entity:has(key)            -- boolean
+entity:keys()              -- string[]
+
+entity:setHandle(handle)
+entity:getCoords()
+entity:setCoords(coords)
+entity:getModel()
+```
+
+`set`/`setr`/`sets` return a boolean: whether the state actually changed.
+
+> **Security.** `setr` values written by a client are validated on the server through the
+> hook pipeline below. A statebag is a network surface like any other — a client can write
+> to its own entity's replicated state, so never trust a replicated value for
+> authorisation. Re-derive it server-side.
+
+## lib.hook — the hook pipeline
+
+Lets other resources add logic to your actions without editing your code, and lets you
+reject an action before it happens. This is the general form of the pattern ox_inventory
+introduced with `registerHook`.
+
+```lua
+local pipeline = lib.hook:new(event, filter)
+-- event:  string
+-- filter: optional function(hook, payload) -> boolean, to select which hooks run
+
+pipeline:registerHook(function(payload)
+    -- inspect, validate, return false to REJECT the operation
+    return true
+end)
+```
+
+Each registered hook can inspect the payload and reject the action; a post-hook runs after
+the pipeline for logging or cleanup without affecting the outcome. ox_lib registers its
+own hooks for statebag validation — that is the mechanism enforcing the `setr` warning
+above. Reference implementations live in `ox_lib/resource/state/server.lua`.
+
+## lib.selector — weighted random selection (shared)
+
+An `OxSelector` holds one or more named sets and picks from them, uniformly or by weight.
+The natural fit for loot tables, random spawns and drop chances — better than a hand-rolled
+`math.random` ladder, which is where off-by-one probability bugs live.
+
+```lua
+local selector = lib.selector:new(sets)
+```
+
+Each item in a set is a `{ weight, value }` tuple: `[1]` is the weight (0 or greater),
+`[2]` is the value returned when selected.
+
+## lib.versionCheck (server)
+
+```lua
+lib.versionCheck('overextended/ox_lib')
+```
+
+Compares the running resource's version against the latest GitHub release and prints a
+notice when it is behind. Worth calling on resource start for anything you distribute.
+
+## lib.getFilesInDirectory (server)
+
+```lua
+local files, fileCount = lib.getFilesInDirectory(path, pattern)
+-- path:    relative or absolute directory to list
+-- pattern: pattern to match filenames against
+```
+
+Useful for auto-loading config or locale files without hardcoding a list in the manifest.
+
+## lib.setClipboard (client)
+
+```lua
+lib.setClipboard('text to copy')
+```
+
+Two gotchas: it silently fails if another NUI component already holds focus, and a newline
+must be written as `\t\n`, not `\n`.
+
 ## Utility modules
 
 Available as `lib.<module>`; see the ox_lib docs for full method lists.

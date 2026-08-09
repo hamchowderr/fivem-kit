@@ -92,7 +92,16 @@ Load the one you need; they are detailed and self-contained.
 > **1.18.1** and current ox_core. Every API documented in these references was confirmed
 > to exist in the installed source — 126 symbols checked, 0 missing.
 >
-> ox still ships fast and `ox_core` remains pre-1.0 in spirit. Check the `version` line in
-> the installed resource's `fxmanifest.lua` before relying on anything recently added, and
-> read the resource source when in doubt: it is the only authority that is never out of
-> date.
+> ox ships fast. Check the `version` line in the installed resource's `fxmanifest.lua`
+> before relying on anything recently added, and read the resource source when in doubt —
+> it is the only authority that is never out of date.
+>
+> **`ox_core` declares no `version` in its fxmanifest**, so there is nothing to check
+> against: pin it by commit rather than by version number. The official docs give ox_core
+> no stability warning and treat it as a normal framework; note only that Overextended was
+> discontinued in 2025 and resumed development in 2026 under community maintainers, so
+> pace and policy have changed within the project's history.
+>
+> Official docs: **https://overextended.dev** (`coxdocs.dev` is legacy — its redirect
+> drops the path and silently serves the homepage with a 200, so old deep links look alive
+> but are not).
