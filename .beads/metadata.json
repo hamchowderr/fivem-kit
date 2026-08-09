@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "fivem_kit",
+  "project_id": "7ef0a5e5-df92-4169-a8e5-881d24986ff2"
+}
