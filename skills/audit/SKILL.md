@@ -8,59 +8,78 @@ description: >
   after writing or modifying any server-side handler. Not for performance review (use the
   perf lens) or for non-FiveM Lua.
 argument-hint: "[resource path, or blank for the whole server]"
-allowed-tools: Bash, Read, Glob, Grep
+allowed-tools: Bash, Read, Glob, Grep, Agent
 ---
 
 Security-audit FiveM Lua: **$ARGUMENTS**
 
-Load the `fivem-security` skill — it holds the full ruleset (SEC-1 … SEC-15 plus the
-performance and compatibility rules). Audit against it.
+You are the supervisor. For anything larger than a single resource, your job is to scope the
+work, fan out specialists, and merge what comes back — not to read every file yourself.
 
 ## 1. Scope
 
-If `$ARGUMENTS` names a resource or path, audit that. If it's empty, detect the server and
-audit the resources that are actually started:
+If `$ARGUMENTS` names a file or one resource, audit it directly (§2) — spawning an agent for
+one small resource costs more than it saves.
+
+Otherwise detect the server and enumerate the resources that are actually started:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/detect-stack.mjs" --json
 ```
 
-Skip the framework and library resources themselves (`ox_*`, `qb-core`, `es_extended`,
-`oxmysql`) unless explicitly asked — audit the server's own resources, which is where the
-exploitable code lives.
+Framework and library resources (`ox_*`, `qb-core`, `es_extended`, `oxmysql`) are skipped
+automatically by the analyser. They are audited upstream, and nobody running this is planning
+to patch ox_inventory.
 
-## 2. Run the mechanical pass
+## 2. The mechanical pass is one command
 
-For each `.lua` file, run the static analyser — it catches SQL injection, dynamic code
-execution, unguarded commands, `source` used after a yield, committed secrets, sensitive
-broadcasts, `while true` without `Wait`, and legacy MySQL APIs:
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/fivem-audit.mjs" <path> --json
+```
 
-If the `fivem-kit` MCP server is connected, call its `fivemAudit` tool per file. Otherwise
-read the files and apply the ruleset by hand.
+It decides **SEC-3, SEC-5, SEC-7, SEC-8, SEC-10, SEC-12, PERF-1 and COMPAT-2** on its own,
+with the false-positive classes already tuned out. Take its output as given; the suppressions
+are deliberate and regression-tested.
 
-## 3. Then do the part a regex cannot
+Each finding carries a `key` of `rule:relative/path.lua:line`. Keep it — that key is how a
+re-audit recognises a finding it has already reported.
 
-The mechanical pass cannot decide the most important rules. For **every**
-`RegisterNetEvent`, `lib.callback.register`, `ESX.RegisterServerCallback`,
-`QBCore.Functions.CreateCallback` and `RegisterNUICallback` on the server, read the handler
-and answer:
+The `reviewRequired` array lists client-reachable handlers the analyser cannot judge. That is
+the reading list for §3.
 
-- **SEC-1** Is every parameter validated against server-side config before it is used?
+## 3. Fan out for the part a regex cannot decide
+
+**Spawn one `fivem-security-auditor` per resource, batched around 8 per message so they run
+concurrently.** Each returns findings for its own resource; none of their file reading lands
+in this conversation. That is the entire point — a 40-resource server is otherwise
+unauditable in one context.
+
+Give each agent the resource path and the detected dialect. Do not paste file contents into
+the prompt; the agent reads what it needs.
+
+For a single resource, do this work yourself instead of spawning:
+
+- **SEC-1** Is every parameter validated against server-side config before use?
 - **SEC-2** Does any price, amount, reward or quantity come from the caller?
 - **SEC-4** Is the action location-bound, and if so is there a distance check?
-- **SEC-9** Is job/group/item permission re-checked server-side, not just in the UI?
-- **SEC-6** Are balance checks and deductions atomic? Is the item added before payment?
-- **SEC-11** Can this be spammed? Is there a cooldown on anything that mints value?
+- **SEC-6** Are the balance check and the deduction atomic?
+- **SEC-9** Is permission re-checked server-side, not only in the UI?
+- **SEC-11** Can this be spammed? Is there a server-enforced cooldown?
+- **SEC-13/14/15** Internal event exposed to the net? Identifier used for authorisation?
+  NUI callback trusted?
 
 Trace the data: client call site → server handler → state mutation. A finding is real only
-if you can name the exploit.
+when you can name the exploit.
 
-## 4. Report
+## 4. Merge and report
+
+Merge every agent's findings into one report. Deduplicate on `key` — two agents can reach the
+same shared file.
 
 Order strictly by severity, most severe first:
 
 ```
-[SEC-2 · CRITICAL] server/shop.lua:41
+[SEC-2 · CRITICAL] myshop/server/shop.lua:41
 Price is taken from the client.
   TriggerServerEvent('shop:buy', item, price)
   → Any player can send their own price and buy a rifle for $1.
@@ -69,11 +88,20 @@ Fix: look the price up from Config.shops[shopId].items[item] server-side.
 
 Rules:
 
-- State the concrete exploit, not the abstract rule. "An attacker could X" with real values.
-- **Omit rules that don't genuinely apply.** A padded report gets ignored and the real
-  CRITICAL is lost with it. Say "no findings" when there are none.
-- Group by file, but sort files by their worst finding.
-- Close with a one-line count by severity.
+- State the concrete exploit with real values, not the abstract rule.
+- **Omit rules that do not genuinely apply.** A padded report gets ignored and the real
+  CRITICAL goes with it. Say "no findings" when there are none.
+- Group by resource, and sort resources by their worst finding.
+- Close with a count by severity and the single highest-value fix.
+- If you spawned agents, say how many resources were audited. A report that silently covered
+  12 of 40 resources reads exactly like one that covered all 40.
 
-Report only. Do not modify files unless asked — an audit that silently rewrites code
-destroys the reviewer's ability to check it.
+## 5. File the findings
+
+CRITICAL and HIGH findings are work, and work belongs in the tracker rather than in a message
+that scrolls away. If `bd` is on PATH and a beads database exists, file them — one issue per
+finding, keyed on the finding `key` so a re-audit updates instead of duplicating. Otherwise
+just report.
+
+Report only. Do not modify files unless asked — an audit that silently rewrites code destroys
+the reviewer's ability to check it.

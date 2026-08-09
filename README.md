@@ -76,6 +76,24 @@ Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
 | `fivem-security` | 15 exploit rules with detection patterns and fixes |
 | `fivem-server-ops` | server.cfg, load order, ACE, artifacts, txAdmin, reading console errors |
 
+### Subagents (Claude Code)
+
+Each takes **one resource** so a whole-server job fans out over them concurrently, and each
+keeps its file reading out of your main conversation.
+
+| Agent | Does |
+|---|---|
+| `fivem-security-auditor` | Audits one resource against SEC-1…15 — deterministic pass, then reads every client-reachable handler for the rules a regex can't decide |
+| `fivem-resource-scout` | Read-only recon: exports, events, callbacks, dependencies, dialect, NUI surface |
+| `fivem-ox-migrator` | Converts one resource ESX/QBCore → ox, in an isolated git worktree so migrators run in parallel |
+| `fivem-manifest-doctor` | Validates and repairs one `fxmanifest.lua` against the files on disk — including the case mismatches that only break on Linux |
+| `fivem-native-researcher` | Exact natives and ox wrappers with verified signatures, never recalled |
+| `fivem-perf-auditor` | Per-frame loops, uncached natives, entity iteration, stuck NUI focus — with cost estimates |
+| `fivem-nui-builder` | The NUI layer for one resource: web assets, Lua bridge, `files{}`, focus lifecycle |
+
+`/fivem:audit` and `/fivem:convert` act as supervisors, batching specialists ~8 per message
+and merging the results.
+
 ### MCP tools (any editor)
 
 `fivemDocs` · `fivemSearch` · `fivemNatives` · `fivemAudit` · `fivemDetectStack`

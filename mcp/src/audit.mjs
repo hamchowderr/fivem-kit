@@ -118,8 +118,16 @@ const PERMISSION_CHECK =
  * qbx_core's `/job` prints the caller's own job and needs no gate; flagging it buries
  * the real finding, which is the point of the whole ruleset.
  */
+/**
+ * Calls that grant value or change privileged state.
+ *
+ * Matched case-insensitively, but note that alternation is literal: `AddMoney` does NOT
+ * match ESX's `addAccountMoney`, and `AddItem` does NOT match `addInventoryItem`. Those
+ * spellings are the ESX Legacy API and appear in the hundreds across real addon
+ * collections, so each family is spelled out rather than assumed.
+ */
 const PRIVILEGED_ACTION =
-  /SetMoney|AddMoney|RemoveMoney|:deposit|:withdraw|AddItem|RemoveItem|SetJob|setJob|SetGang|setGroup|set\s*\(\s*['"]job|SetEntityCoords|setCoords|DropPlayer|:kick|\bban\b|SpawnVehicle|CreateVehicle|AddPermission|RemovePermission|SetPlayerBucket|giveWeapon|GiveWeapon|SetSlotCount|SetMaxWeight|MySQL\.(update|insert|query)|RegisterStash|ConfiscateInventory/i;
+  /SetMoney|AddMoney|RemoveMoney|(?:add|remove|set)AccountMoney|:deposit|:withdraw|AddItem|RemoveItem|(?:add|remove)InventoryItem|SetJob|setJob|(?:Add|Remove)Player(?:To|From)Job|SetGang|setGroup|set\s*\(\s*['"]job|SetMetaData|SetEntityCoords|setCoords|DropPlayer|:kick|\bban\b|SpawnVehicle|CreateVehicle|AddPermission|RemovePermission|SetPlayerBucket|giveWeapon|GiveWeapon|(?:add|remove)Weapon\b|SetSlotCount|SetMaxWeight|MySQL\.(update|insert|query)|RegisterStash|ConfiscateInventory/i;
 
 const RULES = [
   {

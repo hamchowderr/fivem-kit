@@ -85,6 +85,40 @@ describe('known false-positive patterns stay suppressed', () => {
     assert.equal(auditLua(src, 's.lua').findings.filter((f) => f.rule === 'SEC-7').length, 1);
   });
 
+  test('ESX-named privileged actions count as privileged', () => {
+    // `AddMoney` does not match `addAccountMoney`, and `AddItem` does not match
+    // `addInventoryItem`. Those are the ESX Legacy spellings and appear in the hundreds
+    // across real addon collections, so an ungated command using them was invisible.
+    const cases = [
+      `xPlayer.addAccountMoney('bank', tonumber(args[2]))`,
+      `xPlayer.removeAccountMoney('bank', 100)`,
+      `xPlayer.addInventoryItem(args[2], tonumber(args[3]))`,
+      `xPlayer.removeInventoryItem('bread', 1)`,
+      `xPlayer.addWeapon('WEAPON_PISTOL', 250)`,
+    ];
+    for (const action of cases) {
+      const src = `RegisterCommand('x', function(source, args)\n ${action}\nend, false)`;
+      assert.equal(
+        auditLua(src, 'server/main.lua').findings.filter((f) => f.rule === 'SEC-7').length,
+        1,
+        `should flag: ${action}`
+      );
+    }
+  });
+
+  test('a read-only ESX call is still not privileged', () => {
+    // getAccount/canCarryItem read state; flagging them would put every /balance command
+    // in the report and bury the commands that actually grant value.
+    for (const action of [`local a = xPlayer.getAccount('bank')`, `if xPlayer.canCarryItem(i, 1) then end`]) {
+      const src = `RegisterCommand('x', function(source, args)\n ${action}\nend, false)`;
+      assert.equal(
+        auditLua(src, 'server/main.lua').findings.filter((f) => f.rule === 'SEC-7').length,
+        0,
+        `should not flag: ${action}`
+      );
+    }
+  });
+
   test('framework command wrappers with their own gate are not flagged', () => {
     // ESX.RegisterCommand takes the permission group as argument 2
     const src = `ESX.RegisterCommand('setjob', 'admin', function(xPlayer, args)\n xPlayer.setJob(args.job, args.grade)\nend)`;

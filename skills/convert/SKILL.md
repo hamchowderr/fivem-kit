@@ -6,14 +6,31 @@ description: >
   migrations. Use when the user says "convert this to ox", "migrate from ESX/QBCore",
   "port this resource", or "modernise this script". Flags what it cannot safely do
   (item definitions, money mapping) instead of guessing.
-argument-hint: "<resource path>"
-allowed-tools: Bash, Read, Write, Edit, Glob, Grep
+argument-hint: "<resource path, or a server path to migrate everything>"
+allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Agent
 ---
 
 Convert to ox: **$ARGUMENTS**
 
 Load the `fivem-frameworks` skill and read `references/migration-map.md` — it is the
 line-by-line translation table. Load `ox-stack` for the target APIs.
+
+## 0. One resource, or a server?
+
+**One resource** — do it yourself, following §1–§4. A single migration is a coherent piece of
+work with a lot of cross-file context; splitting it up loses more than parallelism gains.
+
+**A whole server** — you are the supervisor. Enumerate the started resources, then spawn one
+`fivem-ox-migrator` per resource, batched around 6 per message. Each runs in its own git
+worktree, so concurrent migrators rewriting different resources cannot collide.
+
+Order matters even when fanning out: migrate the resources others depend on first, and let
+that batch finish before starting the dependents. Give each agent the resource path, the
+source framework, and what the destination server actually runs.
+
+Then merge: one combined report of what converted, what changed behaviour, and what no agent
+could convert. Say how many resources were attempted out of how many exist — a migration
+report that silently covered half the server is worse than no report.
 
 ## 1. Establish what you're converting
 
