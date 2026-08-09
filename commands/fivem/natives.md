@@ -6,14 +6,18 @@ allowed-tools: Read, Grep, WebFetch
 
 Look up: **$ARGUMENTS**
 
-1. Search `${CLAUDE_PLUGIN_ROOT}/skills/fivem-core/references/natives.md` first — it is the
-   curated set, ranked by real usage, and it names the ox_lib wrapper to prefer where one
-   exists. If the `fivem-kit` MCP server is connected, its `fivemNatives` tool does the same
-   lookup.
+1. **If the `fivem-kit` MCP server is connected, use its `fivemNatives` tool.** It searches
+   the complete database — every GTA V native plus the CFX/FiveM namespace, about 7,300 in
+   total — by name, hash, or task description, and returns the authoritative signature.
+   Pass `side: "server"` or `side: "client"` when it matters; many natives exist on both
+   with different hashes.
 
-2. If it isn't there, fetch the authoritative reference at
-   `https://docs.fivem.net/natives/` rather than recalling a signature from memory —
-   argument order and return values are easy to get subtly wrong.
+2. Otherwise search `${CLAUDE_PLUGIN_ROOT}/skills/fivem-core/references/natives.md` — the
+   curated set, ranked by real usage, naming the ox_lib wrapper to prefer.
+
+3. If it is in neither, fetch `https://docs.fivem.net/natives/` rather than recalling a
+   signature from memory — argument order and return values are easy to get subtly wrong,
+   and a plausible-looking wrong signature is worse than admitting you need to check.
 
 Report:
 

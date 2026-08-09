@@ -112,39 +112,95 @@ server.registerTool(
 server.registerTool(
   'fivemNatives',
   {
-    title: 'Look up GTA V natives',
+    title: 'Look up GTA V and FiveM natives',
     description:
-      'Find the GTA V / FiveM native functions for a task — peds, vehicles, entities, blips, controls, animations, NUI, asset loading, NPC tasks — along with the ox_lib wrapper to prefer where one exists. Use before writing any native call you are not certain of.',
+      'Search the COMPLETE native database — every GTA V native plus the CFX/FiveM namespace, about 7,300 in total, with exact parameter names, types, return types and official descriptions. Look a native up by name (SetEntityCoords or SET_ENTITY_COORDS), by hash (0x06843DA7060A026B), or by describing what you want to do ("give weapon to ped", "set vehicle fuel"). ALWAYS use this before writing a native call you are not completely certain of — argument order and return types are easy to get subtly wrong, and this returns the authoritative signature.',
     inputSchema: {
       query: z
         .string()
-        .describe('Native name or what you want to do, e.g. "GetEntityCoords", "spawn a vehicle", "disable controls".'),
+        .describe('Native name, hash, or a description of the task.'),
+      side: z
+        .enum(['client', 'server'])
+        .optional()
+        .describe('Restrict to natives callable on this side. Many natives have both a client version and a server RPC equivalent.'),
+      limit: z.number().int().min(1).max(25).optional().describe('Max search results (default 10).'),
     },
   },
-  async ({ query }) => {
-    const doc = readDocs(['fivem-core/references/natives.md'])[0];
-    if (doc.error) return text(`Natives reference unavailable: ${doc.error}`);
-    const terms = query.toLowerCase().split(/[^a-z0-9_]+/).filter((t) => t.length > 2);
-    const lines = doc.content.split(/\r?\n/);
-    const hits = lines
-      .map((l, i) => ({ l, i, n: terms.filter((t) => l.toLowerCase().includes(t)).length }))
-      .filter((h) => h.n > 0)
-      .sort((a, b) => b.n - a.n)
-      .slice(0, 25);
-    if (!hits.length) {
+  async ({ query, side, limit }) => {
+    let natives;
+    try {
+      natives = await import('./natives.mjs');
+    } catch (e) {
+      return text(`Natives database unavailable: ${e.message}`);
+    }
+
+    // exact name or hash first
+    try {
+      const variants = await natives.getNativeVariants(query);
+      if (variants.length) {
+        const chosen = side ? variants.filter((v) => (v.apiset || 'client') === side) : variants;
+        const use = chosen.length ? chosen : variants;
+        const blocks = use.map((v) => natives.formatNative(v)).join('\n\n---\n\n');
+        const note =
+          variants.length > 1
+            ? `\n\nThis native exists on ${variants.length} sides: ${variants
+                .map((v) => v.apiset || 'client')
+                .join(', ')}. Use the one matching the script you are writing.`
+            : '';
+        const wrapper = oxWrapperHint(use[0].name);
+        return text(`${blocks}${note}${wrapper}`);
+      }
+
+      const results = await natives.searchNatives(query, { limit: limit ?? 10, apiset: side });
+      if (!results.length) {
+        return text(
+          `No native matched "${query}".\nTry different words, or browse https://docs.fivem.net/natives/`
+        );
+      }
+      const body = results
+        .map((n) => {
+          const args = n.params.map((p) => `${p.type} ${p.name}`).join(', ');
+          const sides = [...new Set(n.sides)].join('+');
+          const summary = natives.summarise(n.description);
+          const desc = summary ? `\n    ${summary}` : '';
+          return `${n.results} ${natives.luaName(n.name)}(${args})   [${sides}]${desc}`;
+        })
+        .join('\n\n');
       return text(
-        `No native matched "${query}".\nThe full native list is at https://docs.fivem.net/natives/ — read fivem-core/references/natives.md via fivemDocs for the curated set.`
+        `${results.length} match(es) for "${query}":\n\n${body}\n\n` +
+          `Call fivemNatives again with an exact name for the full signature, parameter docs and examples.${oxWrapperHint(results[0].name)}`
+      );
+    } catch (e) {
+      return text(
+        `Could not query the natives database (${e.message}).\n` +
+          `It is fetched from runtime.fivem.net on first use and cached locally; check network access.\n` +
+          `The curated subset is still available: fivemDocs { "paths": ["fivem-core/references/natives.md"] }`
       );
     }
-    const body = hits
-      .sort((a, b) => a.i - b.i)
-      .map((h) => h.l)
-      .join('\n');
-    return text(
-      `Matches in fivem-core/references/natives.md:\n\n${body}\n\nFull page: fivemDocs { "paths": ["fivem-core/references/natives.md"] }\nComplete native database: https://docs.fivem.net/natives/`
-    );
   }
 );
+
+/** Point at the ox_lib wrapper when one exists — it handles the waiting and cleanup. */
+function oxWrapperHint(nativeName) {
+  const n = nativeName.toUpperCase();
+  const map = [
+    [/^REQUEST_MODEL$|^HAS_MODEL_LOADED$/, 'lib.requestModel(model)'],
+    [/^REQUEST_ANIM_DICT$/, 'lib.requestAnimDict(dict)'],
+    [/^TASK_PLAY_ANIM$/, 'lib.playAnim(ped, dict, clip, ...)'],
+    [/^DRAW_MARKER$/, 'lib.marker.new({...}) + :draw()'],
+    [/^DISABLE_CONTROL_ACTION$/, 'lib.disableControls:Add(...)'],
+    [/^IS_CONTROL_JUST_PRESSED$|^REGISTER_KEY_MAPPING$/, 'lib.addKeybind({...})'],
+    [/^START_SHAPE_TEST/, 'lib.raycast.fromCamera(...) / fromCoords(...)'],
+    [/^CREATE_VEHICLE$/, 'lib.vehicle.create(...) or Ox.CreateVehicle(...) for persistence'],
+    [/^CREATE_PED$/, 'lib.ped.create(...)'],
+    [/^CREATE_OBJECT$/, 'lib.prop.create(...)'],
+    [/^GET_PLAYER_PED$|^PLAYER_PED_ID$/, 'cache.ped (client) / Ox.GetPlayer(src) (server)'],
+  ];
+  for (const [re, wrapper] of map) {
+    if (re.test(n)) return `\n\nox_lib provides a wrapper for this: ${wrapper} — prefer it; it handles the wait, timeout and cleanup.`;
+  }
+  return '';
+}
 
 /* ---------------------------------------------------------------- audit ---- */
 

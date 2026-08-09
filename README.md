@@ -9,6 +9,10 @@ GTA V natives, the full **ox (Overextended)** stack, plus **ESX Legacy**, **QBCo
 **Qbox**. Every API in it is verified against actual resource sources, not recalled from
 training data.
 
+It carries the **complete native database** — all ~6,400 GTA V natives plus the ~940
+CFX/FiveM natives, with exact parameter names, types, return types and official
+descriptions. Look one up by name, by hash, or by describing what you want to do.
+
 It also does two things a docs bundle can't:
 
 - **Detects your server's real stack** and writes in that dialect. ox server gets ox code.
@@ -59,7 +63,7 @@ Cursor, Windsurf, Claude Desktop, VS Code — add to your MCP config:
 | `/fivem:audit [path]` | Security audit against a 15-rule FiveM-specific ruleset |
 | `/fivem:doctor [path]` | Server health check — stack, load order, dependencies, manifests, cfg traps |
 | `/fivem:convert <path>` | Migrate an ESX or QBCore resource to ox |
-| `/fivem:natives <query>` | Look up a native, and the ox wrapper you should use instead |
+| `/fivem:natives <query>` | Look up any of ~7,300 natives, and the ox wrapper to use instead |
 
 ### Skills (load automatically when relevant)
 
@@ -138,10 +142,33 @@ that are. 29 regression tests lock every one of those distinctions in place.
 
 ---
 
+## The native database
+
+`fivemNatives` (and `/fivem:natives`) searches every native FiveM exposes:
+
+| | |
+|---|---|
+| GTA V natives | ~6,416 across 44 namespaces |
+| CFX / FiveM natives | ~943, mostly server-side |
+| Resolvable by | Lua name (`SetEntityCoords`), snake name (`SET_ENTITY_COORDS`), hash (`0x06843DA7060A026B`), or a description of the task |
+
+It knows that many natives exist on **both sides** — `SetEntityCoords` is a client native
+*and* a server RPC equivalent with a different hash — and returns the right one for the
+script you are writing. Where ox_lib wraps a native, it says so, because the wrapper
+handles the waiting and cleanup that hand-written calls skip.
+
+The database is **fetched from the official CitizenFX endpoint on first use and cached
+locally** (30-day TTL), not bundled. Two reasons: the CitizenFX natives repositories
+publish no license, so redistributing the data in an npm package would be legally
+ambiguous; and the database tracks game builds, so a bundled copy goes stale. Set
+`FIVEM_KIT_CACHE` to control the cache location. Everything else in fivem-kit works
+offline.
+
 ## Requirements
 
 Node.js 18+. No FiveM server required for the docs; the detector and doctor need a server
-folder to look at.
+folder to look at. The native database needs network access on first use, then works from
+cache.
 
 ---
 

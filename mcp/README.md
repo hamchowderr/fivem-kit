@@ -53,7 +53,7 @@ shape is the same):
 |---|---|
 | `fivemDocs` | List or read documentation pages. Call with no arguments for the index. |
 | `fivemSearch` | Keyword search across every page, with matching excerpts. |
-| `fivemNatives` | Find the GTA V native for a task, and the ox wrapper to prefer. |
+| `fivemNatives` | Search all ~7,300 GTA V + CFX natives by name, hash or task description. |
 | `fivemAudit` | Static analysis of Lua for exploitable defects, plus review prompts for what a regex cannot decide. |
 | `fivemDetectStack` | Inspect a server folder: framework, libraries, resources, load order, cfg problems. |
 
@@ -67,6 +67,21 @@ that don't apply.
 Rules that need semantic judgement (is this parameter validated? is there a distance
 check?) are **not** guessed at — they come back as targeted review prompts naming the
 entry points found. A report padded with false positives buries the real finding.
+
+### `fivemNatives`
+
+The complete database: ~6,416 GTA V natives across 44 namespaces plus ~943 CFX/FiveM
+natives, with parameter names, types, return types and official descriptions.
+
+Resolves a native by Lua name, snake name, or hash, and searches by task description
+("give weapon to ped"). It distinguishes client natives from their server RPC
+equivalents — these share a name but have different hashes — and points at the ox_lib
+wrapper where one exists.
+
+Fetched from `runtime.fivem.net` on first use and cached for 30 days under
+`$LOCALAPPDATA/fivem-kit` or `$XDG_CACHE_HOME/fivem-kit`; override with
+`FIVEM_KIT_CACHE`. Not bundled: the CitizenFX natives repositories publish no license, and
+the database tracks game builds so a bundled copy would go stale.
 
 ### `fivemDetectStack`
 

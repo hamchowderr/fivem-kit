@@ -1,8 +1,15 @@
 # GTA V natives that actually come up
 
-Ranked by real usage in live ox resources. Full reference: https://docs.fivem.net/natives/
+Ranked by real usage in live ox resources. Where an ox wrapper exists, prefer it — the
+"prefer" notes say which.
 
-Where an ox wrapper exists, prefer it — the "prefer" notes say which.
+> This page is the **curated subset**. For any native not listed here, use the `fivemKit`
+> MCP server's `fivemNatives` tool, which searches the complete database (~6,400 GTA V
+> natives plus ~940 CFX/FiveM natives) by name, hash or task description and returns the
+> exact signature. Failing that: https://docs.fivem.net/natives/
+>
+> Never write a native call from memory when you can look it up — argument order and
+> return types are the easiest thing in FiveM to get subtly, silently wrong.
 
 ---
 
