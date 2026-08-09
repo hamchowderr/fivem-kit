@@ -1,0 +1,36 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "fivem-kit",
+  "description": "FiveM development tooling for Claude Code, by the makers of myRP.build.",
+  "owner": {
+    "name": "Otaku Solutions",
+    "email": "admin@otakusolutions.io"
+  },
+  "plugins": [
+    {
+      "name": "fivem-kit",
+      "source": "./",
+      "description": "Turns Claude Code into a FiveM developer. Stack-aware scaffolding, security + framework-purity auditing, server health checks, and ESX/QBCore → ox migration — grounded in real ox_lib, ox_core, ox_inventory and ox_target APIs rather than guessed ones.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Otaku Solutions"
+      },
+      "homepage": "https://myrp.build",
+      "repository": "https://github.com/hamchowderr/fivem-kit",
+      "license": "MIT",
+      "keywords": [
+        "fivem",
+        "fxserver",
+        "gta5",
+        "lua",
+        "ox",
+        "overextended",
+        "esx",
+        "qbcore",
+        "qbox",
+        "roleplay",
+        "cfx"
+      ]
+    }
+  ]
+}

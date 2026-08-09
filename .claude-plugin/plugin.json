@@ -1,0 +1,26 @@
+{
+  "name": "fivem-kit",
+  "description": "Turns Claude Code into a FiveM developer. Stack-aware scaffolding, security + framework-purity auditing, server health checks, and ESX/QBCore → ox migration — grounded in real ox_lib, ox_core, ox_inventory and ox_target APIs rather than guessed ones. Detects whether your server runs ox, ESX, QBCore or QBox and speaks that dialect.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Otaku Solutions",
+    "email": "admin@otakusolutions.io",
+    "url": "https://otakusolutions.io"
+  },
+  "homepage": "https://myrp.build",
+  "repository": "https://github.com/hamchowderr/fivem-kit",
+  "license": "MIT",
+  "keywords": [
+    "fivem",
+    "fxserver",
+    "gta5",
+    "lua",
+    "ox",
+    "overextended",
+    "esx",
+    "qbcore",
+    "qbox",
+    "roleplay",
+    "cfx"
+  ]
+}

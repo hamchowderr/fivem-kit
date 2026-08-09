@@ -1,0 +1,49 @@
+{
+  "name": "fivem-kit-mcp",
+  "version": "0.1.0",
+  "description": "MCP server serving FiveM, ox (Overextended), ESX and QBCore documentation, security rules, and live server-stack detection to any MCP-capable AI editor.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Otaku Solutions <admin@otakusolutions.io> (https://otakusolutions.io)",
+  "homepage": "https://myrp.build",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hamchowderr/fivem-kit.git",
+    "directory": "mcp"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "fivem",
+    "fxserver",
+    "gta5",
+    "lua",
+    "ox",
+    "overextended",
+    "esx",
+    "qbcore",
+    "documentation"
+  ],
+  "bin": {
+    "fivem-kit-mcp": "src/index.mjs"
+  },
+  "main": "src/index.mjs",
+  "files": [
+    "src",
+    "corpus",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node scripts/build-corpus.mjs",
+    "build:corpus": "node scripts/build-corpus.mjs",
+    "start": "node src/index.mjs",
+    "inspect": "npx -y @modelcontextprotocol/inspector node src/index.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
