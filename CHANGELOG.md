@@ -97,6 +97,37 @@ functionality rather than fixes.
   networking and NUI concepts come from, and both were three months behind); CI passes
   `--no-docs` since it verifies symbols against code, never prose.
 
+- **Real diagnostics via lua-language-server.** `/fivem:lsp` installs Overextended's FiveM type
+  definitions and writes a project `.luarc.json` pointing at them. After that every Lua edit is
+  checked against the real signatures of all ~7,300 natives, and diagnostics arrive
+  automatically — a typo'd native name or a wrong argument count is caught, which no regex
+  rule in this plugin can do. `lua-language-server` must be on PATH; without it the server
+  never starts and nothing else changes. `/fivem:doctor` reports which of the three parts is
+  missing. Design notes in `docs/lsp.md`.
+
+  Two things had to be found by experiment rather than read off the spec, and both fail
+  silently:
+
+  - **`.lsp.json` `settings` are NOT interpolated.** `command` and `args` have
+    `${CLAUDE_PLUGIN_ROOT}` and `${CLAUDE_PLUGIN_DATA}` expanded; `settings` are forwarded
+    verbatim. A probe LSP server that logged what it received showed the literal string
+    `"${CLAUDE_PLUGIN_DATA}/lua-addons"` arriving over `workspace/didChangeConfiguration`. The
+    language server would have looked for a directory of that name and reported nothing at
+    all. Every path therefore lives in `.luarc.json`, which the user's own editor reads too.
+  - **Addon detection ends in a prompt.** lua-language-server's third-party mechanism defaults
+    to asking whether to apply an addon, and an agent session has nobody to answer. The
+    definitions are loaded directly through `Lua.workspace.library` instead, with
+    `checkThirdParty` disabled. Upstream's settings are still honoured — they are read from
+    the addon's `config.json` at setup, so `Lua.runtime.nonstandardSymbol` (CfxLua's `+=` and
+    backtick strings, which are not Lua) stays current without an edit here.
+
+  Manifests are excluded from analysis rather than taught: `fxmanifest.lua` is Lua syntax
+  evaluated in its own global environment, so every directive reads as an undefined global —
+  three warnings on a file every resource has. Listing the directives cannot fix it, because a
+  manifest may declare arbitrary metadata keys; 76 real manifests turned up `legacyversion`,
+  `chat_theme` and `pizza_topping` beside the documented ones. They are already validated
+  properly by a `PreToolUse` hook and `fivem-manifest-doctor`.
+
 - **`docs/hooks.md`** — all 16 hook events with their matchers, the FiveM console-error
   catalogue and what each signature actually means, and how to switch any of them off. They
   were previously documented nowhere.

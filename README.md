@@ -192,6 +192,20 @@ checks, console-error explanations, manifest repair — work identically on all 
 | `/fivem:doctor [path]` | Server health check — stack, load order, dependencies, manifests, cfg traps |
 | `/fivem:natives <query>` | Look up any of ~7,300 natives, and the wrapper to use instead |
 | `/fivem:convert <path>` | Migrate an ESX or QBCore resource to ox |
+| `/fivem:lsp [path]` | Wire up lua-language-server so Lua edits get real diagnostics — see below |
+
+### Real diagnostics, not just rules · Claude Code
+
+The 15 security rules are regexes. They catch what regexes catch. They cannot know that
+`SetEntityCoodrs` is a typo, or that a native takes four arguments and got three.
+
+`/fivem:lsp` installs [Overextended's FiveM type definitions](https://github.com/overextended/fivem-lls-addon)
+and points [lua-language-server](https://luals.github.io/) at them. After that, every Lua edit
+is checked against the real signatures of all ~7,300 natives, and the diagnostics come back
+automatically — no command to run.
+
+It needs `lua-language-server` on your PATH. Without it nothing breaks: the language server
+simply never starts, and everything else works exactly as before.
 
 ### Knowledge skills · Claude Code — load automatically when relevant
 

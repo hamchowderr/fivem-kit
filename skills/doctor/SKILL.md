@@ -53,6 +53,17 @@ If nothing is found, ask for the path to the folder containing `resources/`.
 - Script paths in the manifest that don't exist on disk — and flag case mismatches
   explicitly, since Linux hosts are case-sensitive and Windows is not.
 
+**Language server** (a Note, never an Error — it is optional tooling, not a broken server)
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/fivem-lsp.mjs" status --json
+```
+
+Report only when `ready` is false, in one line: which of the three parts is missing
+(`lua-language-server` on PATH, the type definitions, a wired `.luarc.json`) and that
+`/fivem:lsp` sets it up. Without it, natives are checked by regex rules alone — typo'd native
+names and wrong argument counts go unnoticed.
+
 ## 3. Report
 
 Group as **Errors** (will break at runtime) → **Warnings** (will bite later) →

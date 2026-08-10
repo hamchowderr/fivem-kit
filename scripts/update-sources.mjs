@@ -48,10 +48,15 @@ function git(args, cwd) {
 const head = (dir) => git(['rev-parse', '--short', 'HEAD'], dir).out || '?';
 
 /**
- * Clone if absent, pull if present.
+ * Clone if absent, advance if present.
+ *
+ * Exported because `fivem-lsp.mjs` installs the FiveM type definitions the same way, and a
+ * second hand-written copy of this would be a second place for the shallow-clone bug below
+ * to reappear.
+ *
  * @returns {{name: string, action: 'cloned'|'updated'|'current'|'failed', from?: string, to?: string, error?: string}}
  */
-function sync(name, url, dest) {
+export function sync(name, url, dest) {
   if (!fs.existsSync(dest)) {
     const r = git(['clone', '--depth', '1', '--quiet', url, dest]);
     return r.ok
