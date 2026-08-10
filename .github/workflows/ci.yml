@@ -68,8 +68,10 @@ jobs:
       # Uses the same source list as local development (scripts/sources.mjs), so CI and a
       # developer's machine cannot disagree about what gets verified. A hand-written clone
       # loop here is what drifted from the verifier's targets and broke the build once.
+      # --no-docs: the prose documentation repos are large and nothing here reads them. They
+      # are a writing source, not a verification source.
       - name: Clone ox and framework sources
-        run: node scripts/update-sources.mjs --root "$RUNNER_TEMP"
+        run: node scripts/update-sources.mjs --root "$RUNNER_TEMP" --no-docs
 
       # --strict: every resource must be present. Without it, a clone that produced an empty
       # directory would skip that resource and still exit 0 — a green tick on a check that

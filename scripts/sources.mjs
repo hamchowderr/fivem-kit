@@ -20,6 +20,7 @@ export const OX_SOURCES = [
   'ox_doorlock',
   'ox_fuel',
   'ox_banking',
+  'oxmysql',
 ];
 
 /** Frameworks, each with its own org. */
@@ -29,8 +30,30 @@ export const FRAMEWORK_SOURCES = [
   { name: 'qbx_core', repo: 'Qbox-project/qbx_core' },
 ];
 
+/**
+ * Prose documentation sources — read when writing skills, never symbol-verified.
+ *
+ * These are the upstream docs sites' own repositories. They are the source for anything that
+ * is a *concept* rather than an API symbol: entity ownership, state bags, routing buckets,
+ * the NUI message/callback contract. `verify-docs.mjs` cannot check prose, so the only
+ * protection against writing from a stale copy is keeping the copy fresh.
+ *
+ * Both were three months behind when the Phase 8 skills were written, which is exactly the
+ * window in which a docs site rewrites a page.
+ *
+ * They are large and CI never reads them, so CI passes `--no-docs`.
+ */
+export const DOC_SOURCES = [
+  { name: 'fivem-docs', repo: 'citizenfx/fivem-docs' },
+  { name: 'overextended-docs', repo: 'overextended/docs' },
+];
+
 export const oxRepo = (name) => `https://github.com/overextended/${name}`;
 export const frameworkRepo = (entry) => `https://github.com/${entry.repo}`;
+export const docRepo = (entry) => `https://github.com/${entry.repo}`;
 
-/** Where clones live by default, relative to the repo root: ../fivem-resources/{ox,frameworks} */
+/**
+ * Where clones live by default, relative to the repo root:
+ * ../fivem-resources/{ox,frameworks,docs}
+ */
 export const DEFAULT_ROOT = ['..', 'fivem-resources'];

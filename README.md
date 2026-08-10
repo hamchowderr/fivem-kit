@@ -82,8 +82,9 @@ Give it those, and the same model stops guessing. Concretely, it gains:
 - **A picture of your server.** It reads your `resources/` folder and `server.cfg` once, then
   writes in the dialect you actually run instead of a generic blend.
 - **Real APIs.** Every symbol in the bundled reference is verified against actual resource
-  source — 488 of them, checked in CI on every push — and the official documentation for all
-  five frameworks is searchable in-editor.
+  source — 497 of them, checked in CI on every push, including every native name against the
+  official natives database — and the official documentation for all five frameworks is
+  searchable in-editor.
 - **A security reviewer.** 15 FiveM-specific exploit rules, tuned against 931 real resource
   files, applied to code as it's written rather than after a server gets drained.
 - **Specialists it can delegate to.** Seven subagents, each taking one resource, so auditing or
@@ -201,6 +202,9 @@ checks, console-error explanations, manifest repair — work identically on all 
 | `fivem-server-ops` | server.cfg, load order, ACE, artifacts, txAdmin, reading console errors |
 | `fivem-frameworks` | ESX / QBCore / Qbox dialects and the full migration map |
 | `ox-stack` | ox_lib, ox_core, ox_target, ox_inventory, oxmysql, plus doorlock, fuel, banking and commands |
+| `fivem-networking` | Entity ownership, network IDs, state bags, routing buckets, OneSync scoping |
+| `fivem-nui` | The Lua↔browser bridge, focus and the stuck cursor, `files{}`, build tooling |
+| `fivem-mariadb` | oxmysql, placeholders, schema and indexing, and the atomic update that stops duplication |
 
 ### Subagents · Claude Code
 
@@ -401,9 +405,13 @@ Corrections to the API references are especially welcome — these frameworks mo
 wrong signature in here is worse than a missing one.
 
 Open an issue or PR with the resource version you verified against. CI runs the full suite on
-Node 18/20/22, validates both plugin manifests, and checks all **488 documented symbols** —
-across the ox stack, `es_extended`, `qb-core` and `qbx_core` — against freshly cloned upstream sources. A
-correction that survives that check is one everyone can trust.
+Node 18/20/22, validates both plugin manifests, and checks all **497 documented symbols** —
+across the ox stack, `oxmysql`, `es_extended`, `qb-core`, `qbx_core`, and every native name
+against the official natives database — against freshly cloned upstream sources. A correction
+that survives that check is one everyone can trust.
+
+`node scripts/update-sources.mjs` refreshes every upstream clone the references are written
+from, and reports what moved.
 
 ## License
 

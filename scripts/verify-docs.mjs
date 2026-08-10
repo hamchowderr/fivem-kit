@@ -64,9 +64,12 @@ const fwDoc = (f) => {
  *
  * `init` comes from the resource path in `lib.load('@ox_core.lib.init')`. `md` appears once
  * the scan covers prose as well as reference tables: a sentence mentioning `ox-lib.md` matches
- * the `lib.<name>` pattern and yields "md".
+ * the `lib.<name>` pattern and yields "md". `lua` is the same shape one level up — the import
+ * path `@oxmysql/lib/MySQL.lua` matches `MySQL.<name>`.
+ *
+ * All three are file extensions or path segments, never API names.
  */
-const NOT_SYMBOLS = new Set(['init', 'md']);
+const NOT_SYMBOLS = new Set(['init', 'md', 'lua']);
 
 const walk = (d, acc = []) => {
   let entries = [];
@@ -190,10 +193,12 @@ const targets = [
   {
     name: 'ox_lib',
     version: version('ox_lib'),
-    documented: clean([
-      ...grab(doc(), /\blib\.([A-Za-z_]\w*)/g),
-      ...grab(doc(), /\blib\.([A-Za-z_]\w*)/g),
-    ]),
+    // One grab, not two. These three targets each spread the same `grab` twice, which
+    // deduplicates nothing (`grab` already returns a unique list) and simply counted every
+    // symbol a second time — the headline "488 symbols checked" was inflated by 136.
+    // A verification count that overstates itself is the same failure as a check that passes
+    // without checking, just quieter.
+    documented: clean(grab(doc(), /\blib\.([A-Za-z_]\w*)/g)),
     actual: new Set([
       ...grab(libSrc, /function\s+lib\.([A-Za-z_]\w*)/g),
       ...grab(libSrc, /^\s*lib\.([A-Za-z_]\w*)\s*=/gm),
@@ -215,19 +220,13 @@ const targets = [
   {
     name: 'ox_inventory',
     version: version('ox_inventory'),
-    documented: uniq([
-      ...grab(doc(), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
-      ...grab(doc(), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
-    ]),
+    documented: grab(doc(), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAll(path.join(OX, 'ox_inventory')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
   {
     name: 'ox_core',
     version: version('ox_core'),
-    documented: uniq([
-      ...grab(doc(), /\bOx\.([A-Za-z_]\w*)/g),
-      ...grab(doc(), /\bOx\.([A-Za-z_]\w*)/g),
-    ]),
+    documented: grab(doc(), /\bOx\.([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAll(path.join(OX, 'ox_core')), /\bOx\.([A-Za-z_]\w*)/g)),
   },
   {
@@ -252,6 +251,28 @@ const targets = [
     actual: new Set(grab(readAllTs(path.join(OX, 'ox_banking', 'src')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
 ];
+
+// oxmysql is the database layer every framework sits on, and `fivem-mariadb` documents its
+// whole surface. The Lua API is built in lib/MySQL.lua from an explicit method list plus a
+// few directly-assigned members, so read those rather than guessing.
+const OXMYSQL_LIB = path.join(OX, 'oxmysql', 'lib', 'MySQL.lua');
+if (fs.existsSync(OXMYSQL_LIB)) {
+  const src = fs.readFileSync(OXMYSQL_LIB, 'utf8');
+  // for _, method in pairs({ 'scalar', 'single', … }) do
+  const methodList = src.match(/for\s+_,\s*method\s+in\s+pairs\(\{([\s\S]*?)\}\)/);
+  targets.push({
+    name: 'oxmysql',
+    version: version('oxmysql'),
+    documented: clean(grab(doc(), /\bMySQL\.([A-Za-z_]\w*)/g)),
+    actual: new Set([
+      ...(methodList ? grab(methodList[1], /'([A-Za-z_]\w*)'/g) : []),
+      ...grab(src, /\bMySQL\.([A-Za-z_]\w*)\s*=/g),
+      ...grab(src, /\bfunction\s+MySQL\.([A-Za-z_]\w*)/g),
+      // MySQL.Sync.* / MySQL.Async.* resolve through an alias table
+      ...grab(src, /^\s*([A-Za-z_]\w*)\s*=\s*'(?:query|scalar|single|insert|update|transaction|prepare)'/gm),
+    ]),
+  });
+}
 
 /* ------------------------------------------------------- frameworks ------- */
 
@@ -327,6 +348,115 @@ if (fs.existsSync(path.join(FRAMEWORKS, 'qb-core'))) {
   });
 }
 
+/* ---------------------------------------------------------- natives ------- */
+
+/**
+ * CFX runtime functions — real, callable, and NOT in the natives database.
+ *
+ * The scripting runtime provides these on top of the native ABI, so a lookup against
+ * natives.json correctly reports them as absent. Without this list every one of them would
+ * be flagged as invented, which would make the natives check unusable and therefore ignored.
+ *
+ * Provenance: the Lua runtime function reference in citizenfx/fivem-docs —
+ *   content/docs/scripting-reference/runtimes/lua/functions/*.md
+ * plus the globals the runtime injects that have no page of their own (`Entity`, `Player`,
+ * `GlobalState`, `LocalPlayer`) and the NUI-side `GetParentResourceName`.
+ *
+ * To refresh after `node scripts/update-sources.mjs`:
+ *   ls ../fivem-resources/docs/fivem-docs/content/docs/scripting-reference/runtimes/lua/functions/
+ */
+const RUNTIME_FUNCTIONS = [
+  'AddEventHandler',
+  'RegisterNetEvent',
+  'RegisterServerEvent',
+  'RemoveEventHandler',
+  'TriggerEvent',
+  'TriggerClientEvent',
+  'TriggerServerEvent',
+  'TriggerLatentClientEvent',
+  'TriggerLatentServerEvent',
+  'GetPlayers',
+  'GetPlayerIdentifiers',
+  'PerformHttpRequest',
+  'PerformHttpRequestAwait',
+  'RegisterNUICallback',
+  'SendNUIMessage',
+  'CreateThread',
+  'SetTimeout',
+  'Wait',
+  'Citizen',
+  // runtime-injected globals with no function page of their own
+  'Entity',
+  'Player',
+  'GlobalState',
+  'LocalPlayer',
+  // browser side, injected into the NUI page rather than the Lua runtime
+  'GetParentResourceName',
+];
+
+/**
+ * Every native this documentation claims exists must exist.
+ *
+ * This is the largest surface the project had left unverified: `fivem-core`'s natives
+ * reference, and now the networking and NUI skills, are almost entirely native names. The
+ * whole product promise is "these APIs are real", and until this target existed that promise
+ * was checked for ox and the frameworks but not for the natives themselves.
+ *
+ * Extraction is deliberately conservative, because a noisy check is one people learn to
+ * ignore. Three filters, each earning its place against a real false positive found here:
+ *
+ *  1. **No space before `(`.** Prose puts a parenthetical after a capitalised word — "the
+ *     Overextended (ox) stack", "Chromium (CEF)", "Artifacts (FXServer builds)". Requiring
+ *     `Name(` with no gap removes that entire class.
+ *  2. **At least one lowercase letter.** Keeps SQL types out: `VARCHAR(50)`, `TINYINT(1)`.
+ *  3. **Not reached through `.` or `:`.** A native is always a bare global in Lua. Anything
+ *     qualified is a method on something else — `lib.disableControls:Clear(…)`,
+ *     `exports['qb-target']:AddBoxZone(…)` — and looking it up in natives.json would only
+ *     ever produce a false alarm.
+ *  4. **Not already verified by another target.** `exports.ox_inventory:AddItem(...)` matches
+ *     the shape of a native call, but `AddItem` is ox_inventory's and is checked against
+ *     ox_inventory's own source above. Skipping it here is delegation, not exemption — if it
+ *     were invented, that target fails.
+ *
+ * What this deliberately does NOT cover: a resource we do not clone. The migration tables
+ * document qb-target's old API to say what to replace, and nothing verifies those names
+ * because qb-target is not a source here. They are historical by design.
+ */
+try {
+  const verifiedElsewhere = new Set(targets.flatMap((t) => [...t.actual]));
+
+  // This target DEPENDS on the ox and framework sources being readable. Filter 4 is what
+  // separates a native from a framework method, and with no clones loaded there is nothing
+  // to delegate to — every `ESX.GetExtendedPlayers` shorthand in prose would be reported as
+  // an invented native. Rather than emit a wall of false alarms, declare the dependency:
+  // report SKIPPED, which --strict already treats as a failure.
+  if (verifiedElsewhere.size === 0) throw new Error('no ox/framework source loaded to delegate to');
+
+  const { byName } = await (await import('../mcp/src/natives.mjs')).loadNatives();
+  const documented = uniq(
+    [...allDocs.matchAll(/(?<![:.\w])([A-Z][A-Za-z0-9]{3,})\(/g)]
+      .map((m) => m[1])
+      .filter((n) => /[a-z]/.test(n))
+      .filter((n) => !RUNTIME_FUNCTIONS.includes(n))
+      .filter((n) => !verifiedElsewhere.has(n))
+  );
+  targets.push({
+    name: 'natives',
+    version: 'runtime',
+    documented,
+    // byName is keyed uppercase and holds both SET_NUI_FOCUS and SetNuiFocus, so casing
+    // variants (SendNUIMessage vs SendNuiMessage) collapse to the same key.
+    actual: new Set([...byName.keys()].map((k) => k.toUpperCase())),
+    normalise: (s) => s.toUpperCase(),
+  });
+} catch (err) {
+  // The natives database is fetched over the network, and the target also needs the other
+  // sources present. Either failure must not silently become a pass — push an empty target
+  // so it reports SKIPPED and --strict fails on it.
+  console.error(`natives target unavailable: ${err.message}`);
+  targets.push({ name: 'natives', version: 'runtime', documented: [], actual: new Set() });
+}
+
 console.log(`Verifying fivem-kit documentation against ox sources at ${OX}\n`);
 
 let failed = 0;
@@ -340,8 +470,12 @@ for (const t of targets) {
     skipped.push(t.name);
     continue;
   }
-  const missing = t.documented.filter((s) => !t.actual.has(s));
-  const undocumented = [...t.actual].filter((s) => !t.documented.includes(s));
+  // `normalise` exists for the natives target, where SendNUIMessage and SendNuiMessage are
+  // the same native spelled two ways. Every other target compares names literally.
+  const norm = t.normalise || ((s) => s);
+  const documentedNorm = new Set(t.documented.map(norm));
+  const missing = t.documented.filter((s) => !t.actual.has(norm(s)));
+  const undocumented = [...t.actual].filter((s) => !documentedNorm.has(s));
   checked += t.documented.length;
   failed += missing.length;
 

@@ -12,9 +12,11 @@
  * produces the same checkouts in both places.
  *
  * Usage:
- *   node scripts/update-sources.mjs [--root <dir>] [--json]
+ *   node scripts/update-sources.mjs [--root <dir>] [--no-docs] [--json]
  *
- *   --root   where to put ox/ and frameworks/  (default: ../fivem-resources)
+ *   --root      where to put ox/, frameworks/ and docs/  (default: ../fivem-resources)
+ *   --no-docs   skip the prose documentation repos. They are large, and CI only verifies
+ *               API symbols against code — it never reads them.
  *
  * Exit codes: 0 everything present and current, 1 one or more sources failed.
  */
@@ -24,7 +26,15 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { OX_SOURCES, FRAMEWORK_SOURCES, oxRepo, frameworkRepo, DEFAULT_ROOT } from './sources.mjs';
+import {
+  OX_SOURCES,
+  FRAMEWORK_SOURCES,
+  DOC_SOURCES,
+  oxRepo,
+  frameworkRepo,
+  docRepo,
+  DEFAULT_ROOT,
+} from './sources.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
@@ -82,20 +92,30 @@ function main() {
   const root =
     rootFlag === -1 ? path.resolve(REPO, ...DEFAULT_ROOT) : path.resolve(argv[rootFlag + 1]);
 
+  const withDocs = !argv.includes('--no-docs');
+
   const oxDir = path.join(root, 'ox');
   const fwDir = path.join(root, 'frameworks');
+  const docDir = path.join(root, 'docs');
   fs.mkdirSync(oxDir, { recursive: true });
   fs.mkdirSync(fwDir, { recursive: true });
+  if (withDocs) fs.mkdirSync(docDir, { recursive: true });
 
   const results = [
     ...OX_SOURCES.map((n) => sync(n, oxRepo(n), path.join(oxDir, n))),
     ...FRAMEWORK_SOURCES.map((f) => sync(f.name, frameworkRepo(f), path.join(fwDir, f.name))),
+    ...(withDocs
+      ? DOC_SOURCES.map((d) => sync(d.name, docRepo(d), path.join(docDir, d.name)))
+      : []),
   ];
 
   if (argv.includes('--json')) {
     console.log(JSON.stringify({ root, results }, null, 2));
   } else {
     console.log(`Sources under ${root}\n`);
+    if (!withDocs) {
+      console.log(`  skipped  ${DOC_SOURCES.length} prose docs repo(s) (--no-docs)\n`);
+    }
     for (const r of results) {
       const detail =
         r.action === 'updated'

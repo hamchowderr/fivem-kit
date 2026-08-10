@@ -68,6 +68,18 @@ describe('the verifier refuses to pass without verifying', () => {
     assert.match(r.out, /0 documented symbols checked/);
   });
 
+  test('the natives target declares its dependency instead of guessing', () => {
+    // The natives check tells a native from a framework method by delegating: anything the
+    // ox/framework targets already verified is not a native. With no sources loaded there is
+    // nothing to delegate to, and every `ESX.GetExtendedPlayers` shorthand in prose would be
+    // reported as an invented native — a wall of false alarms that would get the whole check
+    // switched off. It must skip and say so, not guess.
+    const r = run(tmp('natives-nodeps'));
+    assert.match(r.out, /natives target unavailable/);
+    assert.match(r.out, /natives\s+SKIPPED/);
+    assert.equal(r.status, 1);
+  });
+
   test('--strict is accepted and does not change the no-sources verdict', () => {
     const r = run(tmp('empty-strict'), '--strict');
     assert.equal(r.status, 1);

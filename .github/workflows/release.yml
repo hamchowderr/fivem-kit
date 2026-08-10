@@ -61,7 +61,7 @@ jobs:
         run: claude plugin validate .claude-plugin/plugin.json
 
       - name: Clone ox and framework sources
-        run: node scripts/update-sources.mjs --root "$RUNNER_TEMP"
+        run: node scripts/update-sources.mjs --root "$RUNNER_TEMP" --no-docs
 
       - name: Verify documented APIs against source
         env:
