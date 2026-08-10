@@ -68,6 +68,7 @@ jobs:
           done
           git clone --depth 1 --quiet https://github.com/esx-framework/esx_core "$RUNNER_TEMP/frameworks/esx_core"
           git clone --depth 1 --quiet https://github.com/qbcore-framework/qb-core "$RUNNER_TEMP/frameworks/qb-core"
+          git clone --depth 1 --quiet https://github.com/Qbox-project/qbx_core "$RUNNER_TEMP/frameworks/qbx_core"
 
       - name: Verify documented APIs against source
         env:

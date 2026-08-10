@@ -61,9 +61,12 @@ const fwDoc = (f) => {
 
 /**
  * Symbols the extraction regexes pick up that are not APIs.
- * `lib.init` comes from the resource path in `lib.load('@ox_core.lib.init')`.
+ *
+ * `init` comes from the resource path in `lib.load('@ox_core.lib.init')`. `md` appears once
+ * the scan covers prose as well as reference tables: a sentence mentioning `ox-lib.md` matches
+ * the `lib.<name>` pattern and yields "md".
  */
-const NOT_SYMBOLS = new Set(['init']);
+const NOT_SYMBOLS = new Set(['init', 'md']);
 
 const walk = (d, acc = []) => {
   let entries = [];
@@ -120,13 +123,46 @@ const readAllTs = (dir) =>
     })
     .join('\n');
 
-const doc = (f) => {
-  try {
-    return fs.readFileSync(path.join(DOCS, f), 'utf8');
-  } catch {
-    return '';
-  }
-};
+/**
+ * EVERY markdown file under skills/, concatenated.
+ *
+ * This deliberately replaces a hardcoded list of reference files. That list covered 10 of 26
+ * documents and left 96 API symbols unverified — including migration-map.md, which is the
+ * file that tells people how to translate between frameworks and is therefore the worst one
+ * to have wrong. A SKILL.md body makes API claims exactly like a reference file does.
+ *
+ * Scanning everything means a new document is covered the moment it exists, rather than when
+ * someone remembers to add it here.
+ */
+const allDocs = (() => {
+  const dir = path.join(REPO, 'skills');
+  const out = [];
+  const walkMd = (d) => {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(d, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walkMd(p);
+      else if (e.name.endsWith('.md')) {
+        try {
+          out.push(fs.readFileSync(p, 'utf8'));
+        } catch {
+          /* unreadable */
+        }
+      }
+    }
+  };
+  walkMd(dir);
+  return out.join('\n');
+})();
+
+/** Kept for call-site readability; every target now reads the whole corpus. */
+const doc = () => allDocs;
+const fwDocAll = () => allDocs;
 
 const uniq = (a) => [...new Set(a)].sort();
 const grab = (text, re) => uniq([...text.matchAll(re)].map((m) => m[1]));
@@ -155,8 +191,8 @@ const targets = [
     name: 'ox_lib',
     version: version('ox_lib'),
     documented: clean([
-      ...grab(doc('ox-lib.md'), /\blib\.([A-Za-z_]\w*)/g),
-      ...grab(doc('patterns.md'), /\blib\.([A-Za-z_]\w*)/g),
+      ...grab(doc(), /\blib\.([A-Za-z_]\w*)/g),
+      ...grab(doc(), /\blib\.([A-Za-z_]\w*)/g),
     ]),
     actual: new Set([
       ...grab(libSrc, /function\s+lib\.([A-Za-z_]\w*)/g),
@@ -173,15 +209,15 @@ const targets = [
   {
     name: 'ox_target',
     version: version('ox_target'),
-    documented: grab(doc('ox-target.md'), /exports\.ox_target:([A-Za-z_]\w*)/g),
+    documented: grab(doc(), /exports\.ox_target:([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAll(path.join(OX, 'ox_target')), /function\s+api\.([A-Za-z_]\w*)/g)),
   },
   {
     name: 'ox_inventory',
     version: version('ox_inventory'),
     documented: uniq([
-      ...grab(doc('ox-inventory.md'), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
-      ...grab(doc('patterns.md'), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
+      ...grab(doc(), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
+      ...grab(doc(), /exports\.ox_inventory:([A-Za-z_]\w*)/g),
     ]),
     actual: new Set(grab(readAll(path.join(OX, 'ox_inventory')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
@@ -189,21 +225,21 @@ const targets = [
     name: 'ox_core',
     version: version('ox_core'),
     documented: uniq([
-      ...grab(doc('ox-core.md'), /\bOx\.([A-Za-z_]\w*)/g),
-      ...grab(doc('patterns.md'), /\bOx\.([A-Za-z_]\w*)/g),
+      ...grab(doc(), /\bOx\.([A-Za-z_]\w*)/g),
+      ...grab(doc(), /\bOx\.([A-Za-z_]\w*)/g),
     ]),
     actual: new Set(grab(readAll(path.join(OX, 'ox_core')), /\bOx\.([A-Za-z_]\w*)/g)),
   },
   {
     name: 'ox_doorlock',
     version: version('ox_doorlock'),
-    documented: grab(doc('ox-doorlock.md'), /exports\.ox_doorlock:([A-Za-z_]\w*)/g),
+    documented: grab(doc(), /exports\.ox_doorlock:([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAll(path.join(OX, 'ox_doorlock')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
   {
     name: 'ox_fuel',
     version: version('ox_fuel'),
-    documented: grab(doc('ox-fuel.md'), /exports\.ox_fuel:([A-Za-z_]\w*)/g),
+    documented: grab(doc(), /exports\.ox_fuel:([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAll(path.join(OX, 'ox_fuel')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
   {
@@ -212,7 +248,7 @@ const targets = [
     // which under --strict is a failure rather than a silent pass.
     name: 'ox_banking',
     version: version('ox_banking'),
-    documented: grab(doc('ox-banking.md'), /exports\.ox_banking:([A-Za-z_]\w*)/g),
+    documented: grab(doc(), /exports\.ox_banking:([A-Za-z_]\w*)/g),
     actual: new Set(grab(readAllTs(path.join(OX, 'ox_banking', 'src')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
   },
 ];
@@ -232,7 +268,7 @@ if (fs.existsSync(ESX_SRC)) {
     // xPlayer methods are documented as `xPlayer.method(`. es_extended defines them BOTH
     // ways — `self.method = function` and `function self.method(` — so both are collected
     // separately rather than as one alternation, since `grab` only reads capture group 1.
-    documented: grab(fwDoc('esx.md'), /\bxPlayer\.([A-Za-z_]\w*)\s*\(/g),
+    documented: grab(fwDocAll(), /\bxPlayer\.([A-Za-z_]\w*)\s*\(/g),
     actual: new Set([
       ...grab(esxSrc, /\bself\.([A-Za-z_]\w*)\s*=\s*function/g),
       ...grab(esxSrc, /\bfunction\s+self\.([A-Za-z_]\w*)/g),
@@ -241,10 +277,24 @@ if (fs.existsSync(ESX_SRC)) {
   targets.push({
     name: 'ESX.*',
     version: 'framework',
-    documented: grab(fwDoc('esx.md'), /\bESX\.([A-Za-z_]\w*)\s*\(/g),
+    documented: grab(fwDocAll(), /\bESX\.([A-Za-z_]\w*)\s*\(/g),
     actual: new Set([
       ...grab(esxSrc, /^function ESX\.([A-Za-z_]\w*)/gm),
       ...grab(esxSrc, /\bESX\.([A-Za-z_]\w*)\s*=/g),
+    ]),
+  });
+}
+
+// Qbox. Documented in qbcore.md as `exports.qbx_core:*` and previously verified by nothing.
+const qbxDir = path.join(FRAMEWORKS, 'qbx_core');
+if (fs.existsSync(qbxDir)) {
+  targets.push({
+    name: 'qbx_core',
+    version: 'framework',
+    documented: grab(fwDocAll(), /exports\.qbx_core:([A-Za-z_]\w*)/g),
+    actual: new Set([
+      ...grab(readAll(qbxDir), /exports\(\s*'([A-Za-z_]\w*)'/g),
+      ...grab(readAll(qbxDir), /\bfunction\s+[A-Za-z_]\w*[.:]([A-Za-z_]\w*)/g),
     ]),
   });
 }
@@ -253,7 +303,7 @@ if (fs.existsSync(path.join(FRAMEWORKS, 'qb-core'))) {
   targets.push({
     name: 'QBCore.Functions',
     version: 'framework',
-    documented: grab(fwDoc('qbcore.md'), /\bQBCore\.Functions\.([A-Za-z_]\w*)/g),
+    documented: grab(fwDocAll(), /\bQBCore\.Functions\.([A-Za-z_]\w*)/g),
     actual: new Set(grab(qbSrc, /function QBCore\.Functions\.([A-Za-z_]\w*)/g)),
   });
   // Player methods are defined on a class with a colon — `function Player:AddMoney(...)` —
@@ -265,8 +315,8 @@ if (fs.existsSync(path.join(FRAMEWORKS, 'qb-core'))) {
     name: 'Player methods',
     version: 'framework',
     documented: uniq([
-      ...grab(fwDoc('qbcore.md'), /\bPlayer:([A-Za-z_]\w*)\s*\(/g),
-      ...grab(fwDoc('qbcore.md'), /\bPlayer\.Functions\.([A-Za-z_]\w*)/g),
+      ...grab(fwDocAll(), /\bPlayer:([A-Za-z_]\w*)\s*\(/g),
+      ...grab(fwDocAll(), /\bPlayer\.Functions\.([A-Za-z_]\w*)/g),
     ]),
     actual: new Set([
       ...grab(qbSrc, /\bfunction\s+Player:([A-Za-z_]\w*)/g),

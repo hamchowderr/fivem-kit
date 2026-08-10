@@ -82,7 +82,7 @@ Give it those, and the same model stops guessing. Concretely, it gains:
 - **A picture of your server.** It reads your `resources/` folder and `server.cfg` once, then
   writes in the dialect you actually run instead of a generic blend.
 - **Real APIs.** Every symbol in the bundled reference is verified against actual resource
-  source — 220 of them, checked in CI on every push — and the official documentation for all
+  source — 488 of them, checked in CI on every push — and the official documentation for all
   five frameworks is searchable in-editor.
 - **A security reviewer.** 15 FiveM-specific exploit rules, tuned against 931 real resource
   files, applied to code as it's written rather than after a server gets drained.
@@ -401,8 +401,8 @@ Corrections to the API references are especially welcome — these frameworks mo
 wrong signature in here is worse than a missing one.
 
 Open an issue or PR with the resource version you verified against. CI runs the full suite on
-Node 18/20/22, validates both plugin manifests, and checks all **387 documented symbols** —
-across the ox stack, `es_extended` and `qb-core` — against freshly cloned upstream sources. A
+Node 18/20/22, validates both plugin manifests, and checks all **488 documented symbols** —
+across the ox stack, `es_extended`, `qb-core` and `qbx_core` — against freshly cloned upstream sources. A
 correction that survives that check is one everyone can trust.
 
 ## License

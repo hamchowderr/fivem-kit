@@ -74,6 +74,7 @@ jobs:
           # The ESX and QBCore references are verified against their real source too.
           git clone --depth 1 --quiet https://github.com/esx-framework/esx_core "$RUNNER_TEMP/frameworks/esx_core"
           git clone --depth 1 --quiet https://github.com/qbcore-framework/qb-core "$RUNNER_TEMP/frameworks/qb-core"
+          git clone --depth 1 --quiet https://github.com/Qbox-project/qbx_core "$RUNNER_TEMP/frameworks/qbx_core"
 
       # --strict: every resource must be present. Without it, a clone that produced an empty
       # directory would skip that resource and still exit 0 — a green tick on a check that
