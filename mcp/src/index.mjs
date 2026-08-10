@@ -42,6 +42,16 @@ async function loadDetector() {
 const text = (s) => ({ content: [{ type: 'text', text: s }] });
 const json = (o) => text(JSON.stringify(o, null, 2));
 
+/**
+ * A result carrying both the human-readable text and the typed payload (MCP 2025-06-18).
+ *
+ * The text block is not optional even when `structuredContent` is present — the spec requires
+ * it, and it is what an older client or a plain LLM actually reads. `structuredContent` is
+ * validated against the tool's `outputSchema` by the SDK, so a shape that drifts from the
+ * schema fails loudly here rather than silently reaching a caller.
+ */
+const structured = (s, data) => ({ content: [{ type: 'text', text: s }], structuredContent: data });
+
 const server = new McpServer({ name: PKG.name, version: PKG.version });
 
 /* ------------------------------------------------------------------ docs ---- */
@@ -222,6 +232,45 @@ function oxWrapperHint(nativeName) {
 
 /* ---------------------------------------------------------------- audit ---- */
 
+/**
+ * Structured output shapes (MCP 2025-06-18).
+ *
+ * Declaring an `outputSchema` means every successful return MUST carry a matching
+ * `structuredContent`, so these shapes have to cover the failure paths too — hence `ok` and
+ * an optional `error` rather than a separate error return. The text block stays exactly as it
+ * was: the spec requires it, and a client that ignores structured output is unaffected.
+ *
+ * The field names mirror what `auditLua` and `detectStack` already return, so there is one
+ * shape to keep true rather than two that can drift apart.
+ */
+const FINDING_SHAPE = z.object({
+  rule: z.string().describe('Rule id, e.g. SEC-5.'),
+  severity: z.enum(['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']),
+  title: z.string(),
+  file: z.string(),
+  line: z.number(),
+  code: z.string().describe('The offending source line.'),
+  message: z.string().describe('Why it is exploitable.'),
+  fix: z.string(),
+});
+
+const AUDIT_OUTPUT = {
+  ok: z.boolean().describe('False when the source could not be read.'),
+  error: z.string().optional(),
+  file: z.string(),
+  findings: z.array(FINDING_SHAPE),
+  reviewRequired: z
+    .array(z.object({ rules: z.array(z.string()), note: z.string() }))
+    .describe('Client-reachable handlers the analyser cannot judge. Read these by hand.'),
+  counts: z.object({
+    CRITICAL: z.number(),
+    HIGH: z.number(),
+    MEDIUM: z.number(),
+    LOW: z.number(),
+  }),
+  rulesChecked: z.array(z.string()),
+};
+
 server.registerTool(
   'fivemAudit',
   {
@@ -238,8 +287,14 @@ server.registerTool(
       source: z.string().optional().describe('Lua source to analyse.'),
       filePath: z.string().optional().describe('Path to a .lua file to read and analyse instead.'),
     },
+    outputSchema: AUDIT_OUTPUT,
   },
   async ({ source, filePath }) => {
+    const empty = { findings: [], reviewRequired: [], counts: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 } };
+    const rulesChecked = RULE_IDS.map((r) => r.id);
+    const fail = (name, message) =>
+      structured(message, { ok: false, error: message, file: name, ...empty, rulesChecked });
+
     let code = source;
     let name = 'input.lua';
     if (!code && filePath) {
@@ -247,14 +302,28 @@ server.registerTool(
         code = fs.readFileSync(filePath, 'utf8');
         name = path.basename(filePath);
       } catch (e) {
-        return text(`Could not read ${filePath}: ${e.message}`);
+        return fail(path.basename(filePath), `Could not read ${filePath}: ${e.message}`);
       }
     }
-    if (!code) return text('Provide either `source` or `filePath`.');
+    if (!code) return fail(name, 'Provide either `source` or `filePath`.');
 
     const result = auditLua(code, name);
+    const counts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0 };
+    for (const f of result.findings) counts[f.severity]++;
+    const data = {
+      ok: true,
+      file: name,
+      findings: result.findings,
+      reviewRequired: result.reviewRequired,
+      counts,
+      rulesChecked,
+    };
+
     if (!result.findings.length && !result.reviewRequired.length) {
-      return text(`No deterministic findings in ${name}.\n\nRules checked: ${RULE_IDS.map((r) => r.id).join(', ')}`);
+      return structured(
+        `No deterministic findings in ${name}.\n\nRules checked: ${rulesChecked.join(', ')}`,
+        data
+      );
     }
 
     const parts = [];
@@ -277,11 +346,57 @@ server.registerTool(
       );
     }
     parts.push('Full ruleset: fivemDocs { "paths": ["fivem-security/SKILL.md"] }');
-    return text(parts.join('\n\n'));
+    return structured(parts.join('\n\n'), data);
   }
 );
 
 /* --------------------------------------------------------------- detect ---- */
+
+/** One detected category: the winner, its human label, and everything else found. */
+const STACK_CATEGORY = z.object({
+  primary: z.string().nullable(),
+  label: z.string().nullable(),
+  all: z.array(z.string()),
+});
+
+const DETECT_OUTPUT = {
+  found: z.boolean(),
+  error: z.string().optional(),
+  searchedFrom: z.string().optional(),
+  serverRoot: z.string().nullable(),
+  serverCfg: z.string().nullable(),
+  dialect: z.enum(['ox', 'esx', 'qbcore', 'qbox', 'standalone']).nullable(),
+  mixedFrameworks: z.boolean(),
+  stack: z
+    .object({
+      framework: STACK_CATEGORY,
+      mysql: STACK_CATEGORY,
+      inventory: STACK_CATEGORY,
+      target: STACK_CATEGORY,
+      lib: STACK_CATEGORY,
+    })
+    .nullable(),
+  counts: z.object({ resources: z.number(), startedInCfg: z.number() }).nullable(),
+  warnings: z
+    .object({
+      onDiskNotStarted: z.array(z.string()),
+      startedNotOnDisk: z.array(z.string()),
+      semicolonLinesInCfg: z.array(z.object({ line: z.number(), text: z.string() })),
+    })
+    .nullable(),
+  resources: z
+    .array(
+      z.object({
+        name: z.string(),
+        path: z.string(),
+        relPath: z.string(),
+        dependencies: z.array(z.string()),
+        started: z.boolean(),
+      })
+    )
+    .optional(),
+  guidance: z.string().describe('Which dialect to write, in one line.'),
+};
 
 server.registerTool(
   'fivemDetectStack',
@@ -305,13 +420,29 @@ server.registerTool(
         .optional()
         .describe('Include the full per-resource list. Default false — summary only.'),
     },
+    outputSchema: DETECT_OUTPUT,
   },
   async ({ serverPath, includeResources }) => {
+    const notFound = (message, searchedFrom) =>
+      structured(message, {
+        found: false,
+        error: message,
+        ...(searchedFrom ? { searchedFrom } : {}),
+        serverRoot: null,
+        serverCfg: null,
+        dialect: null,
+        mixedFrameworks: false,
+        stack: null,
+        counts: null,
+        warnings: null,
+        guidance: 'No server detected — ask for the path to the folder containing resources/.',
+      });
+
     const detectStack = await loadDetector();
-    if (!detectStack) return text('Stack detector unavailable in this installation.');
+    if (!detectStack) return notFound('Stack detector unavailable in this installation.');
 
     const r = detectStack(serverPath ?? process.cwd());
-    if (!r.found) return text(`${r.error}\n\nSearched from: ${r.searchedFrom}`);
+    if (!r.found) return notFound(`${r.error}\n\nSearched from: ${r.searchedFrom}`, r.searchedFrom);
 
     const summary = {
       serverRoot: r.serverRoot,
@@ -339,7 +470,18 @@ server.registerTool(
       ? '\n\nWARNING: more than one framework is installed. Confirm which is authoritative before writing code — mixing them causes duplicate player state and money desync.'
       : '';
 
-    return text(`${JSON.stringify(summary, null, 2)}\n\nGuidance: ${guidance}${warn}`);
+    return structured(`${JSON.stringify(summary, null, 2)}\n\nGuidance: ${guidance}${warn}`, {
+      found: true,
+      serverRoot: r.serverRoot,
+      serverCfg: r.serverCfg,
+      dialect: r.dialect,
+      mixedFrameworks: r.mixedFrameworks,
+      stack: r.stack,
+      counts: r.counts,
+      warnings: r.warnings,
+      ...(includeResources ? { resources: r.resources } : {}),
+      guidance,
+    });
   }
 );
 

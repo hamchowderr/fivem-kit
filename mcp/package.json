@@ -1,6 +1,6 @@
 {
   "name": "fivem-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server serving FiveM, ox (Overextended), ESX and QBCore documentation, security rules, and live server-stack detection to any MCP-capable AI editor.",
   "type": "module",
   "license": "MIT",

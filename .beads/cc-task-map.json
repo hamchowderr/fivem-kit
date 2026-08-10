@@ -7,6 +7,13 @@
       "title": "Plugin root CLAUDE.md triggers a validate warning",
       "created_at": "2026-08-09T22:07:12.117Z",
       "updated_at": "2026-08-09T22:07:12.117Z"
+    },
+    {
+      "bd_id": "fivem-kit-1bo",
+      "cc_task_id": null,
+      "title": "Add outputSchema + structuredContent to fivemAudit and fivemDetectStack",
+      "created_at": "2026-08-10T05:44:14.145Z",
+      "updated_at": "2026-08-10T05:44:14.145Z"
     }
   ]
 }

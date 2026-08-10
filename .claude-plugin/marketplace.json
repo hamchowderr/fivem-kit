@@ -12,7 +12,7 @@
       "displayName": "fivem-kit",
       "source": "./",
       "description": "Turns Claude Code into a FiveM developer. Stack-aware scaffolding, security + framework-purity auditing, server health checks, and ESX/QBCore → ox migration — grounded in real ox_lib, ox_core, ox_inventory and ox_target APIs rather than guessed ones.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "author": {
         "name": "Otaku Solutions"
       },
