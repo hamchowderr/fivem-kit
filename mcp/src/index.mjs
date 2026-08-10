@@ -122,14 +122,15 @@ server.registerTool(
       query: z.string().describe('What you are looking for, in plain words or API names.'),
       limit: z.number().int().min(1).max(20).optional().describe('Max results (default 8).'),
       source: z
-        .enum(['kit', 'ox', 'qbcore', 'fivem'])
+        .enum(['kit', 'ox', 'qbcore', 'esx', 'qbox', 'fivem'])
         .optional()
         .describe(
-          'Which corpus to search. "kit" (default) is the bundled, source-verified reference. ' +
-            '"ox" and "qbcore" fetch the framework\'s official documentation; "fivem" fetches the ' +
-            'official Cfx.re docs — the server manual, scripting manual and scripting reference, ' +
-            'which is where convars, server.cfg, OneSync, routing buckets and streaming live. ' +
-            'ESX and Qbox publish no machine-readable corpus, so their coverage lives in "kit".'
+          'Which corpus to search. "kit" (default) is the bundled, source-verified reference — ' +
+            'fastest, and the only one available offline. The rest fetch that project\'s OWN ' +
+            'official documentation: "ox", "qbcore", "esx", "qbox", and "fivem" for the Cfx.re ' +
+            'server manual and scripting reference, which is where convars, server.cfg, OneSync, ' +
+            'routing buckets and streaming are documented. Use an official source when you need ' +
+            'the authoritative wording or something the bundled reference does not cover.'
         ),
     },
   },

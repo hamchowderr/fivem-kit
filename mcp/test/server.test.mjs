@@ -97,13 +97,11 @@ describe('tool declarations', () => {
     assert.deepEqual(withSchema, ['fivemAudit', 'fivemDetectStack']);
   });
 
-  test('fivemSearch offers only the sources that actually publish a corpus', () => {
-    // ESX and Qbox are deliberately absent: neither publishes a machine-readable corpus, and
-    // offering them would invite a caller to request documentation that does not exist.
+  test('fivemSearch offers every framework fivem-kit claims to support', () => {
     const search = tools.find((t) => t.name === 'fivemSearch');
     const source = search.inputSchema.properties?.source;
     assert.ok(source, 'fivemSearch must accept a source');
-    assert.deepEqual([...source.enum].sort(), ['fivem', 'kit', 'ox', 'qbcore']);
+    assert.deepEqual([...source.enum].sort(), ['esx', 'fivem', 'kit', 'ox', 'qbcore', 'qbox']);
   });
 });
 

@@ -42,6 +42,14 @@ const TTL_MS = 7 * 24 * 60 * 60 * 1000; // docs move faster than the natives dat
  * @property {string} [note]    why a source is unavailable, shown to the caller
  */
 
+/**
+ * Only the FiveM sections that fill a real gap. `game-references` is deliberately excluded:
+ * 1.3 MB of weapon and vehicle hash tables, which the natives database already covers better,
+ * and including it would quadruple the download for material nobody greps here.
+ */
+const FIVEM_SECTIONS = ['server-manual', 'scripting-manual', 'scripting-reference', 'cookbook']
+  .map((s) => `content/docs/${s}/`);
+
 /** @type {Record<string, RemoteSource>} */
 export const REMOTE_SOURCES = {
   ox: {
@@ -58,52 +66,52 @@ export const REMOTE_SOURCES = {
     minHits: 50,
     minBytes: 100_000,
   },
+  // ESX's docs site is the soft-404 described above, and Qbox's publishes nothing at all —
+  // but both RENDER from markdown in git, so the real source is the repository. Serving
+  // those means every framework fivem-kit claims to support has official coverage.
   esx: {
-    url: 'https://documentation.esx-framework.org/llms-full.txt',
     label: 'ESX Legacy — official',
-    marker: /xPlayer|es_extended/g,
+    marker: /xPlayer|es_extended|ESX\./g,
     minHits: 25,
-    minBytes: 100_000,
-    note:
-      'ESX publishes no usable llms-full.txt: the docs site is a single-page app that answers ' +
-      '200 for every path and returns its HTML homepage. fivem-kit falls back to its own ' +
-      'hand-written ESX reference, which was verified against the es_extended source.',
+    minBytes: 60_000,
+    build: repoCorpus({
+      repo: 'esx-framework/esx-legacy-documentation',
+      branch: 'tested',
+      prefixes: ['src/pages/'],
+      strip: 'src/pages/',
+    }),
+    source: 'https://github.com/esx-framework/esx-legacy-documentation',
   },
   qbox: {
-    url: 'https://docs.qbox.re/llms-full.txt',
     label: 'Qbox — official',
-    marker: /qbx_core|qbx/g,
+    marker: /qbx_core|qbx|ox_lib/g,
     minHits: 25,
-    minBytes: 100_000,
-    note: 'Qbox publishes no llms-full.txt (404). fivem-kit falls back to its own Qbox reference.',
+    minBytes: 50_000,
+    build: repoCorpus({
+      repo: 'Qbox-project/qbox-docs',
+      branch: 'main',
+      prefixes: ['docs/'],
+      strip: 'docs/',
+    }),
+    source: 'https://github.com/Qbox-project/qbox-docs',
   },
   fivem: {
     label: 'FiveM / Cfx.re — official',
     marker: /RegisterNetEvent|GetConvar|fx_version|OneSync|resource/g,
     minHits: 50,
     minBytes: 150_000,
-    build: buildFivemCorpus,
+    build: repoCorpus({
+      repo: 'citizenfx/fivem-docs',
+      branch: 'master',
+      prefixes: FIVEM_SECTIONS,
+      strip: 'content/docs/',
+    }),
     source: 'https://github.com/citizenfx/fivem-docs',
   },
 };
 
-/**
- * The FiveM documentation is not published as a corpus — `docs.fivem.net` is a Hugo site
- * with no `llms.txt` and no sitemap. The markdown behind it lives in `citizenfx/fivem-docs`,
- * which publishes NO license, so it is fetched at runtime and never redistributed — the same
- * reasoning that keeps the natives database out of the npm package.
- *
- * Only the sections that fill a real gap are fetched. `game-references` is deliberately
- * excluded: it is 1.3 MB of weapon and vehicle hash tables, which the natives database
- * already covers better, and it would quadruple the download for material nobody greps here.
- */
-const FIVEM_SECTIONS = ['server-manual', 'scripting-manual', 'scripting-reference', 'cookbook'];
-
-const RAW = 'https://raw.githubusercontent.com/citizenfx/fivem-docs/master/';
-const TREE = 'https://api.github.com/repos/citizenfx/fivem-docs/git/trees/master?recursive=1';
-
 /** Fetch with bounded concurrency — 188 files at once would be rude and get us throttled. */
-async function fetchAll(paths, fetchImpl, concurrency = 8) {
+async function fetchAll(paths, fetchImpl, base, concurrency = 8) {
   const out = new Array(paths.length);
   let next = 0;
   await Promise.all(
@@ -111,7 +119,7 @@ async function fetchAll(paths, fetchImpl, concurrency = 8) {
       while (next < paths.length) {
         const i = next++;
         try {
-          const r = await fetchImpl(RAW + paths[i], { headers: { 'user-agent': 'fivem-kit' } });
+          const r = await fetchImpl(base + paths[i], { headers: { 'user-agent': 'fivem-kit' } });
           out[i] = r.ok ? await r.text() : '';
         } catch {
           out[i] = '';
@@ -123,37 +131,51 @@ async function fetchAll(paths, fetchImpl, concurrency = 8) {
 }
 
 /**
- * Assemble the FiveM corpus: enumerate once via the git tree API (one request, so the
- * unauthenticated 60/hour API limit is a non-issue), then pull the files from
- * raw.githubusercontent, which is not subject to that limit.
+ * Build a corpus from a documentation repository's markdown.
+ *
+ * Several projects render their docs from markdown in git but publish nothing
+ * machine-readable from the site itself — FiveM's is a Hugo site, ESX's and Qbox's are SPAs.
+ * The markdown is the real source, so we assemble from it.
+ *
+ * None of these repositories publish a license, so nothing is redistributed: the corpus is
+ * fetched onto the user's own machine at runtime, the same reasoning that keeps the natives
+ * database out of the npm package.
+ *
+ * Enumeration is ONE git-tree request, keeping us clear of the unauthenticated 60/hour API
+ * limit; the files themselves come from raw.githubusercontent, which is not subject to it.
  */
-async function buildFivemCorpus(fetchImpl = fetch) {
-  const res = await fetchImpl(TREE, { headers: { 'user-agent': 'fivem-kit' } });
-  if (!res.ok) throw new Error(`tree listing -> HTTP ${res.status}`);
-  const tree = await res.json();
-  if (tree.truncated) throw new Error('tree listing was truncated; refusing a partial corpus');
+function repoCorpus({ repo, branch, prefixes, strip }) {
+  return async function build(fetchImpl = fetch) {
+    const treeUrl = `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`;
+    const res = await fetchImpl(treeUrl, { headers: { 'user-agent': 'fivem-kit' } });
+    if (!res.ok) throw new Error(`tree listing -> HTTP ${res.status}`);
+    const tree = await res.json();
+    if (tree.truncated) throw new Error('tree listing was truncated; refusing a partial corpus');
 
-  const paths = (tree.tree || [])
-    .filter(
-      (e) =>
-        e.type === 'blob' &&
-        e.path.endsWith('.md') &&
-        FIVEM_SECTIONS.some((s) => e.path.startsWith(`content/docs/${s}/`))
-    )
-    .map((e) => e.path)
-    .sort();
+    const paths = (tree.tree || [])
+      .filter(
+        (e) =>
+          e.type === 'blob' &&
+          /\.mdx?$/.test(e.path) &&
+          prefixes.some((p) => e.path.startsWith(p))
+      )
+      .map((e) => e.path)
+      .sort();
 
-  if (!paths.length) throw new Error('no markdown found in the expected sections');
+    if (!paths.length) throw new Error('no markdown found in the expected sections');
 
-  const bodies = await fetchAll(paths, fetchImpl);
-  const parts = [];
-  for (let i = 0; i < paths.length; i++) {
-    if (!bodies[i]) continue;
-    // A `# path` heading per file so search reports which page a hit came from.
-    const title = paths[i].replace('content/docs/', '').replace(/\.md$/, '');
-    parts.push(`# ${title}\n\n${bodies[i]}`);
-  }
-  return parts.join('\n\n---\n\n');
+    const base = `https://raw.githubusercontent.com/${repo}/${branch}/`;
+    const bodies = await fetchAll(paths, fetchImpl, base);
+
+    const parts = [];
+    for (let i = 0; i < paths.length; i++) {
+      if (!bodies[i]) continue;
+      // A `# path` heading per file so search reports which page a hit came from.
+      const title = paths[i].replace(strip ?? '', '').replace(/\.mdx?$/, '');
+      parts.push(`# ${title}\n\n${bodies[i]}`);
+    }
+    return parts.join('\n\n---\n\n');
+  };
 }
 
 function cacheDir() {

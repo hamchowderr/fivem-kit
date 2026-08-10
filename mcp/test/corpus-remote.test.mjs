@@ -71,21 +71,22 @@ describe('validation rejects a soft-404', () => {
 
 describe('a failing source never poisons the cache', () => {
   test('an HTML body is not cached and not served', async () => {
-    const html = `<!doctype html><html>${'x'.repeat(200_000)} xPlayer xPlayer xPlayer</html>`;
-    const r = await loadRemoteCorpus('esx', { refresh: true, fetchImpl: fakeFetch(html) });
+    // ox is a URL-served source, so this exercises the exact path that would have cached
+    // ESX's homepage before the corpus moved to the repository.
+    const html = `<!doctype html><html>${'x'.repeat(400_000)} lib.callback ox_target ox_inventory</html>`;
+    const r = await loadRemoteCorpus('ox', { refresh: true, fetchImpl: fakeFetch(html) });
     assert.equal(r.ok, false);
     assert.equal(r.text, undefined, 'nothing may be served from a failed validation');
     assert.match(r.reason, /HTML/);
   });
 
-  test('a 404 degrades with an explanation rather than throwing', async () => {
-    const r = await loadRemoteCorpus('qbox', {
+  test('a 404 degrades rather than throwing', async () => {
+    const r = await loadRemoteCorpus('ox', {
       refresh: true,
       fetchImpl: fakeFetch('', { ok: false, status: 404 }),
     });
     assert.equal(r.ok, false);
     assert.match(r.reason, /404/);
-    assert.match(r.reason, /falls back/, 'the caller must be told what happens instead');
   });
 
   test('a network error degrades rather than throwing', async () => {
@@ -144,15 +145,11 @@ describe('searching a corpus', () => {
 });
 
 describe('source inventory', () => {
-  test('reports which sources are usable and why the others are not', () => {
-    const sources = describeSources();
-    const byName = Object.fromEntries(sources.map((s) => [s.name, s]));
-    assert.equal(byName.ox.available, true);
-    assert.equal(byName.qbcore.available, true);
-    assert.equal(byName.fivem.available, true);
-    assert.equal(byName.esx.available, false);
-    assert.match(byName.esx.note, /single-page app/);
-    assert.equal(byName.qbox.available, false);
+  test('every framework fivem-kit supports has an official source', () => {
+    const byName = Object.fromEntries(describeSources().map((s) => [s.name, s]));
+    for (const name of ['ox', 'qbcore', 'esx', 'qbox', 'fivem']) {
+      assert.equal(byName[name]?.available, true, `${name} must have an official source`);
+    }
   });
 });
 
@@ -215,10 +212,21 @@ describe('live sources still behave as documented', { skip: !online }, () => {
     assert.match(r.text, /lib\.callback/);
   });
 
-  test('ESX is still a soft-404 and is still refused', async () => {
-    // If this ever starts passing, ESX has published a real corpus — delete the note and
-    // mark the source available.
-    const r = await loadRemoteCorpus('esx', { refresh: true });
-    assert.equal(r.ok, false, 'ESX unexpectedly served a valid corpus — update REMOTE_SOURCES');
+  test("ESX's published llms-full.txt is still the soft-404 that forced the repo route", async () => {
+    // Documents WHY the ESX corpus is assembled from git rather than fetched from the site.
+    // If this ever starts serving real text, the simpler URL route becomes available again.
+    const res = await fetch('https://documentation.esx-framework.org/llms-full.txt');
+    const body = await res.text();
+    assert.equal(res.status, 200, 'it answers 200 — which is exactly the trap');
+    assert.ok(/^\s*<(!doctype|html)/i.test(body), 'and returns HTML, so status alone proves nothing');
+  });
+
+  test('every official corpus assembles and contains its signature API', async () => {
+    const probes = { esx: 'xPlayer', qbox: 'qbx_core', fivem: 'GetConvar', qbcore: 'PlayerData' };
+    for (const [name, needle] of Object.entries(probes)) {
+      const r = await loadRemoteCorpus(name);
+      assert.equal(r.ok, true, `${name}: ${r.reason}`);
+      assert.ok(r.text.includes(needle), `${name} corpus should mention ${needle}`);
+    }
   });
 });
