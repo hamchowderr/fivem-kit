@@ -68,7 +68,7 @@ jobs:
           done
 
       - name: Verify documented ox APIs against source
-        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox"
+        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox" --strict
 
       # Refuse to publish a version that already exists, rather than letting npm reject it
       # halfway through and leaving the tag looking published.

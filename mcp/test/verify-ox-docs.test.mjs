@@ -1,0 +1,67 @@
+/**
+ * Exit-code tests for the ox documentation verifier.
+ *
+ * This script is a CI gate, so its exit code IS its contract. It previously printed
+ * "All documented ox APIs verified present" and exited 0 after checking zero symbols, which
+ * meant a clone that produced empty directories showed a green tick on a check that never
+ * ran. A green that means nothing is worse than a red, because nobody investigates green.
+ *
+ * The success path needs real ox checkouts and is covered by CI itself; what is pinned here
+ * is every way the check can fail to actually check anything.
+ */
+
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const SCRIPT = path.join(ROOT, 'scripts', 'verify-ox-docs.mjs');
+
+function run(...args) {
+  const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', timeout: 60_000 });
+  return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
+}
+
+const tmp = (name) => fs.mkdtempSync(path.join(os.tmpdir(), `ox-${name}-`));
+
+describe('the verifier refuses to pass without verifying', () => {
+  test('a missing sources directory exits 2', () => {
+    const r = run(path.join(os.tmpdir(), 'definitely-not-here-ox'));
+    assert.equal(r.status, 2);
+    assert.match(r.out, /sources not found/i);
+  });
+
+  test('an empty sources directory exits 1, not 0', () => {
+    // The regression: this used to print "All documented ox APIs verified present" and exit 0.
+    const r = run(tmp('empty'));
+    assert.equal(r.status, 1, 'verifying nothing must not be success');
+    assert.match(r.out, /Verified NOTHING/);
+    assert.ok(!/All documented ox APIs verified present\./.test(r.out), 'must not claim success');
+  });
+
+  test('present but empty resource directories exit 1', () => {
+    const dir = tmp('skeleton');
+    for (const r of ['ox_lib', 'ox_core', 'ox_target', 'ox_inventory']) {
+      fs.mkdirSync(path.join(dir, r), { recursive: true });
+    }
+    const r = run(dir);
+    assert.equal(r.status, 1, 'four empty checkouts verify nothing');
+    assert.match(r.out, /0 documented symbols checked/);
+  });
+
+  test('--strict is accepted and does not change the no-sources verdict', () => {
+    const r = run(tmp('empty-strict'), '--strict');
+    assert.equal(r.status, 1);
+  });
+
+  test('the flag is not mistaken for the sources path', () => {
+    // `--strict` must be parsed as a flag; treating it as the directory would make the
+    // script report "sources not found" for a path the user never passed.
+    const r = run('--strict');
+    assert.notEqual(r.out.includes("'--strict'"), true, 'the flag must not be read as a path');
+  });
+});

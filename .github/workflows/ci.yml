@@ -72,8 +72,11 @@ jobs:
             git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
           done
 
+      # --strict: every resource must be present. Without it, a clone that produced an empty
+      # directory would skip that resource and still exit 0 — a green tick on a check that
+      # never ran.
       - name: Verify documented ox APIs against source
-        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox"
+        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox" --strict
 
       - name: Release gate (version consistency + changelog)
         run: node scripts/check-release.mjs
