@@ -94,6 +94,17 @@
         ]
       }
     ],
+    "PostToolBatch": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/fivem-hook.mjs", "batch"]
+          }
+        ]
+      }
+    ],
     "PostToolUseFailure": [
       {
         "matcher": "Bash",

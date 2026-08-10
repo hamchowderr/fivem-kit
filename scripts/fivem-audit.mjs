@@ -82,22 +82,35 @@ export function isFrameworkPath(file) {
  *
  * This is what makes re-auditing idempotent. It must not contain an absolute path, or the
  * same finding would get a different key on another machine and file a duplicate issue.
+ *
+ * The root must be a *directory* that contains the file, not the file itself. Auditing a
+ * single file with the file as its own root yields an empty relative path, and every file
+ * then collapses to the same key — which silently deduplicates findings across unrelated
+ * files. Callers auditing one file should pass the project or server directory as `root`.
  */
 export function findingKey(finding, root) {
-  const rel = path.relative(root, finding.file).split(path.sep).join('/');
+  let rel = path.relative(root, finding.file).split(path.sep).join('/');
+  if (!rel || rel.startsWith('..')) rel = path.basename(finding.file);
   return `${finding.rule}:${rel}:${finding.line}`;
 }
 
 /**
  * Audit a file, a resource directory, or a whole server folder.
+ *
+ * @param {string} target what to audit
+ * @param {{minSeverity?: string, includeFramework?: boolean, root?: string}} opts
+ *   `root` is the directory finding keys are made relative to. It defaults to the target,
+ *   which is correct for a directory but wrong for a single file — pass the project or
+ *   server directory when auditing one file, so its key matches the one a full run produces.
  * @returns {{root: string, files: number, findings: object[], reviewRequired: object[],
  *            counts: object, skipped: string[]}}
  */
-export function audit(target, { minSeverity = 'low', includeFramework = false } = {}) {
-  const root = path.resolve(target);
+export function audit(target, { minSeverity = 'low', includeFramework = false, root: rootOpt } = {}) {
+  const target_ = path.resolve(target);
+  const root = rootOpt ? path.resolve(rootOpt) : target_;
   const threshold = SEVERITY_ORDER[String(minSeverity).toUpperCase()] ?? SEVERITY_ORDER.LOW;
 
-  const all = collectLua(root);
+  const all = collectLua(target_);
   const skipped = [];
   const files = includeFramework
     ? all

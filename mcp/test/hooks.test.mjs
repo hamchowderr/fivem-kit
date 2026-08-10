@@ -64,6 +64,7 @@ const HANDLERS = [
   'subagent-brief',
   'pre-write',
   'post-write',
+  'batch',
   'console',
   'stop',
   'invalidate',
@@ -207,16 +208,26 @@ describe('pre-write blocks what should never land', () => {
   });
 });
 
-describe('post-write lints what was written', () => {
-  test('reports a CRITICAL finding in a file that was just written', () => {
-    const cwd = configuredProject();
-    const file = path.join(cwd, 'resources', 'myshop', 'server', 'main.lua');
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, `MySQL.query('SELECT * FROM users WHERE n = "' .. name .. '"')\n`);
+/** Write a Lua file with a planted SEC-5 and return its path. */
+function vulnerableFile(cwd, name) {
+  const file = path.join(cwd, 'resources', 'myshop', 'server', name);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `MySQL.query('SELECT * FROM users WHERE n = "' .. name .. '"')\n`);
+  return file;
+}
 
-    const r = run('post-write', { cwd, session_id: 't', tool_name: 'Write', tool_input: { file_path: file } });
-    assert.equal(r.json.hookSpecificOutput.hookEventName, 'PostToolUse');
-    assert.match(r.json.hookSpecificOutput.additionalContext, /SEC-5/);
+describe('post-write queues rather than interrupting', () => {
+  test('a single write produces no output of its own', () => {
+    const cwd = configuredProject();
+    const file = vulnerableFile(cwd, 'main.lua');
+    const r = run('post-write', {
+      cwd,
+      session_id: 'queue-1',
+      tool_name: 'Write',
+      tool_input: { file_path: file },
+    });
+    assert.equal(r.status, 0);
+    assert.equal(r.stdout.trim(), '', 'the batch hook reports; per-file output is the noise we removed');
   });
 
   test('says nothing about a clean file', () => {
@@ -244,6 +255,61 @@ describe('post-write lints what was written', () => {
     });
     assert.equal(r.status, 0);
     assert.equal(r.stdout.trim(), '');
+  });
+});
+
+describe('PostToolBatch reports the whole batch exactly once', () => {
+  test('six writes produce one aggregated report, not six interruptions', () => {
+    const cwd = configuredProject();
+    const session_id = 'batch-agg';
+    const files = ['a.lua', 'b.lua', 'c.lua', 'd.lua', 'e.lua', 'f.lua'].map((n) => vulnerableFile(cwd, n));
+
+    for (const file of files) {
+      const r = run('post-write', { cwd, session_id, tool_name: 'Write', tool_input: { file_path: file } });
+      assert.equal(r.stdout.trim(), '', 'each write must stay silent');
+    }
+
+    const batch = run('batch', { cwd, session_id, tool_calls: files.map((f) => ({ tool_name: 'Write' })) });
+    assert.equal(batch.json.hookSpecificOutput.hookEventName, 'PostToolBatch');
+    const ctx = batch.json.hookSpecificOutput.additionalContext;
+    assert.match(ctx, /6 finding\(s\) across 6 file\(s\)/);
+    assert.match(ctx, /6 CRITICAL/);
+    for (const f of files) assert.ok(ctx.includes(path.basename(f)), `${path.basename(f)} must appear`);
+  });
+
+  test('the queue is drained, so a second batch is silent', () => {
+    const cwd = configuredProject();
+    const session_id = 'batch-drain';
+    run('post-write', { cwd, session_id, tool_input: { file_path: vulnerableFile(cwd, 'x.lua') } });
+
+    assert.ok(run('batch', { cwd, session_id }).json, 'first batch reports');
+    assert.equal(run('batch', { cwd, session_id }).stdout.trim(), '', 'second batch has nothing left');
+  });
+
+  test('a batch with no queued findings says nothing', () => {
+    assert.equal(run('batch', { cwd: configuredProject(), session_id: 'empty' }).stdout.trim(), '');
+  });
+
+  test('the same finding written twice is reported once', () => {
+    const cwd = configuredProject();
+    const session_id = 'batch-dedupe';
+    const file = vulnerableFile(cwd, 'dupe.lua');
+    run('post-write', { cwd, session_id, tool_input: { file_path: file } });
+    run('post-write', { cwd, session_id, tool_input: { file_path: file } });
+
+    const ctx = run('batch', { cwd, session_id }).json.hookSpecificOutput.additionalContext;
+    assert.match(ctx, /1 finding\(s\) across 1 file\(s\)/);
+  });
+
+  test('Stop is the backstop when the batch hook never drains', () => {
+    const cwd = configuredProject();
+    const session_id = 'batch-backstop';
+    run('post-write', { cwd, session_id, tool_input: { file_path: vulnerableFile(cwd, 'orphan.lua') } });
+
+    // No `batch` call — the turn ended on a tool result and the batch output was discarded.
+    const stop = run('stop', { cwd, session_id });
+    assert.match(stop.json.hookSpecificOutput.additionalContext, /unreported finding/);
+    assert.match(stop.json.hookSpecificOutput.additionalContext, /SEC-5/);
   });
 });
 

@@ -152,7 +152,14 @@ const HANDLERS = {
 
     let result;
     try {
-      result = audit(file, { minSeverity: 'high', includeFramework: true });
+      // `root` matters: without it the single-file audit would key every finding off an
+      // empty relative path, so unrelated files would collide. Keying off the server (or
+      // project) directory also makes this key identical to the one /fivem:audit produces.
+      result = audit(file, {
+        minSeverity: 'high',
+        includeFramework: true,
+        root: config.serverPath ?? config.projectDir,
+      });
     } catch {
       silent();
     }
@@ -163,13 +170,56 @@ const HANDLERS = {
 
     if (!result.findings.length) silent();
 
-    const lines = result.findings
-      .slice(0, 10)
-      .map((f) => `[${f.rule} · ${f.severity}] line ${f.line} — ${f.message}\n  fix: ${f.fix}`);
-    context(
-      'PostToolUse',
-      `fivem audit of ${path.basename(file)} — ${result.findings.length} finding(s):\n\n${lines.join('\n\n')}`
-    );
+    // Queue rather than report. When Claude writes six files at once this handler runs six
+    // times, and six separate interruptions is how a linter gets switched off. PostToolBatch
+    // drains the queue and reports once; `stop` is the backstop if it never does.
+    const queued = readState(event, 'findings.json', []);
+    const seen = new Set(queued.map((f) => f.key));
+    for (const f of result.findings) {
+      if (seen.has(f.key)) continue;
+      seen.add(f.key);
+      queued.push({ key: f.key, rule: f.rule, severity: f.severity, line: f.line, file, message: f.message, fix: f.fix });
+    }
+    writeState(event, 'findings.json', queued.slice(-100));
+    silent();
+  },
+
+  /**
+   * PostToolBatch — report every finding from the batch exactly once.
+   *
+   * This is the noise fix. `post-write` audits and queues silently; this drains the queue
+   * after the whole batch of parallel tool calls resolves, so a six-file write produces one
+   * aggregated report instead of six interruptions.
+   *
+   * Verified against the runtime rather than the prose: the hook-output schema in the
+   * Claude Code binary carries `{hookEventName: "PostToolBatch", additionalContext: string?}`.
+   * The published decision-control table lists only top-level `decision` for this event,
+   * which is what an earlier revision of this plugin wrongly took as the whole contract.
+   */
+  batch(event) {
+    const queued = readState(event, 'findings.json', []);
+    if (!queued.length) silent();
+    clearState(event, 'findings.json');
+
+    const byFile = new Map();
+    for (const f of queued) {
+      if (!byFile.has(f.file)) byFile.set(f.file, []);
+      byFile.get(f.file).push(f);
+    }
+
+    const blocks = [];
+    for (const [file, findings] of byFile) {
+      const lines = findings
+        .slice(0, 8)
+        .map((f) => `  [${f.rule} · ${f.severity}] line ${f.line} — ${f.message}\n    fix: ${f.fix}`);
+      blocks.push(`${path.basename(file)}\n${lines.join('\n')}`);
+    }
+
+    const critical = queued.filter((f) => f.severity === 'CRITICAL').length;
+    const summary =
+      `fivem audit — ${queued.length} finding(s) across ${byFile.size} file(s)` +
+      (critical ? `, ${critical} CRITICAL` : '');
+    context('PostToolBatch', `${summary}\n\n${blocks.slice(0, 12).join('\n\n')}`);
   },
 
   /** PostToolUse / PostToolUseFailure on Bash — explain a known FiveM console error. */
@@ -201,12 +251,24 @@ const HANDLERS = {
     );
   },
 
-  /** Stop — say once, at the end of a turn, if Lua was written and never audited. */
+  /** Stop — the backstop, plus one nudge at the end of a turn that wrote a lot of Lua. */
   stop(event, config) {
     if (!config.remindOnStop) silent();
     const written = readState(event, 'written.json', []);
     clearState(event, 'written.json');
-    if (written.length < 3) silent(); // one or two files is not worth a nudge
+
+    // If PostToolBatch never drained the queue — a turn that ended on a tool result gets its
+    // batch output discarded — the findings would otherwise vanish. Report them here.
+    const undrained = readState(event, 'findings.json', []);
+    clearState(event, 'findings.json');
+    if (undrained.length) {
+      const lines = undrained
+        .slice(0, 10)
+        .map((f) => `  [${f.rule} · ${f.severity}] ${path.basename(f.file)}:${f.line} — ${f.message}`);
+      context('Stop', `fivem audit — ${undrained.length} unreported finding(s):\n${lines.join('\n')}`);
+    }
+
+    if (written.length < 3) silent(); // one or two clean files is not worth a nudge
 
     context(
       'Stop',

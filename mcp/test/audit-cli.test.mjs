@@ -114,4 +114,23 @@ describe('finding keys are stable across machines', () => {
     const f = { rule: 'SEC-5', file: path.join('/srv', 'server', 'main.lua'), line: 3 };
     assert.equal(findingKey(f, '/srv'), 'SEC-5:server/main.lua:3');
   });
+
+  test('a file as its own root falls back to the basename, never an empty path', () => {
+    // Auditing one file used to make root === the file, so path.relative returned '' and
+    // every file collapsed to the same key — silently deduplicating unrelated findings.
+    const f = { rule: 'SEC-5', file: path.join('/srv', 'a.lua'), line: 1 };
+    assert.equal(findingKey(f, path.join('/srv', 'a.lua')), 'SEC-5:a.lua:1');
+    const g = { rule: 'SEC-5', file: path.join('/srv', 'b.lua'), line: 1 };
+    assert.notEqual(findingKey(f, f.file), findingKey(g, g.file), 'two files must never share a key');
+  });
+
+  test('auditing one file with an explicit root matches a full run', () => {
+    const dir = server();
+    const one = path.join(dir, 'resources', 'myshop', 'server', 'main.lua');
+    const single = audit(one, { root: dir, includeFramework: true }).findings.map((f) => f.key);
+    const full = audit(dir, { includeFramework: true })
+      .findings.filter((f) => f.file === one)
+      .map((f) => f.key);
+    assert.deepEqual(single, full, 'the write-time key must equal the full-audit key');
+  });
 });
