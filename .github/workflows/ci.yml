@@ -60,8 +60,20 @@ jobs:
 
       # Every ox API this project documents must exist in the real ox sources. This is what
       # stops the docs drifting into APIs that were never real — the whole point of the kit.
+      #
+      # The sources have to be cloned: without them the script exits 2 ("sources not found")
+      # and the step fails for a reason that has nothing to do with the docs. Shallow clones
+      # of upstream mean this checks against ox as it is TODAY, so an upstream rename shows
+      # up here rather than in a user's editor.
+      - name: Clone ox sources
+        run: |
+          mkdir -p "$RUNNER_TEMP/ox"
+          for r in ox_lib ox_core ox_target ox_inventory; do
+            git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
+          done
+
       - name: Verify documented ox APIs against source
-        run: node scripts/verify-ox-docs.mjs
+        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox"
 
       - name: Release gate (version consistency + changelog)
         run: node scripts/check-release.mjs
