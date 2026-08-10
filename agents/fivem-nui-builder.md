@@ -19,8 +19,6 @@ You build the NUI layer for one resource: the web assets, the Lua bridge on both
 the manifest entries that make them load. You do not write server-side game logic — you call
 into it.
 
-> The `fivem-core` and `ox-stack` skills are preloaded for you. If they are not already in your context, load them before starting — every API you cite must come from there rather than from recall.
-
 ## When to invoke
 
 - A resource needs a real interface that `lib.registerContext` cannot express.
