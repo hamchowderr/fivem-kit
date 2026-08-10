@@ -50,6 +50,12 @@ server.registerTool(
   'fivemDocs',
   {
     title: 'Read FiveM documentation',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description:
       'Read fivem-kit documentation pages covering the FiveM Lua runtime, fxmanifest.lua, GTA natives, the ox (Overextended) stack — ox_lib, ox_core, ox_target, ox_inventory — ESX Legacy, QBCore, Qbox, security rules, worked resource examples, and framework migration. Call with no arguments to list every available page, then request the ones you need. Prefer this over recalling FiveM APIs from memory: these pages are verified against real resource sources.',
     inputSchema: {
@@ -85,6 +91,12 @@ server.registerTool(
   'fivemSearch',
   {
     title: 'Search FiveM documentation',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description:
       'Keyword search across all fivem-kit documentation. Use when you know what you want to do but not which page covers it — e.g. "progress bar animation", "callback timeout", "job grade check", "stash permissions", "convert qb-target". Returns ranked pages with matching excerpts; follow up with fivemDocs for full content.',
     inputSchema: {
@@ -113,6 +125,12 @@ server.registerTool(
   'fivemNatives',
   {
     title: 'Look up GTA V and FiveM natives',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
       'Search the COMPLETE native database — every GTA V native plus the CFX/FiveM namespace, about 7,300 in total, with exact parameter names, types, return types and official descriptions. Look a native up by name (SetEntityCoords or SET_ENTITY_COORDS), by hash (0x06843DA7060A026B), or by describing what you want to do ("give weapon to ped", "set vehicle fuel"). ALWAYS use this before writing a native call you are not completely certain of — argument order and return types are easy to get subtly wrong, and this returns the authoritative signature.',
     inputSchema: {
@@ -208,6 +226,12 @@ server.registerTool(
   'fivemAudit',
   {
     title: 'Audit FiveM Lua for exploits',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
     description:
       'Statically analyse FiveM Lua source for exploitable defects: SQL injection, dynamic code execution, unrestricted admin commands, `source` used after a yield, secrets committed into scripts, all-player broadcasts, infinite loops with no Wait, and legacy MySQL APIs. Also returns targeted review prompts for the flaws that cannot be detected mechanically (unvalidated event parameters, client-supplied prices, missing distance checks). Pass either source text or a file path. Use whenever writing or reviewing a server-side handler.',
     inputSchema: {
@@ -263,6 +287,12 @@ server.registerTool(
   'fivemDetectStack',
   {
     title: 'Detect a FiveM server stack',
+    annotations: {
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: true,
+    },
     description:
       'Inspect a FiveM server folder and report which framework and libraries it actually runs — ox_core, ESX Legacy, QBCore or Qbox; ox_lib, oxmysql, ox_target, ox_inventory and their alternatives — plus every installed resource with its declared dependencies, the server.cfg load order, resources started but missing from disk, and cfg lines containing a semicolon (which FiveM splits on rather than treating as a comment). Run this BEFORE writing code for a server so you use the right dialect.',
     inputSchema: {
