@@ -56,6 +56,17 @@ functionality rather than fixes.
   manifests agree with each other, agree with the tag, and the changelog documents that
   version.
 
+- **Four more ox resources documented** — `ox_doorlock` (12 exports across both sides, its
+  events, and why `registerHook` beats scattering permission checks), `ox_fuel`
+  (`setPaymentMethod` / `setMoneyCheck` as the integration surface for a custom economy),
+  `ox_banking` (a front end; the money lives in ox_core's accounts) and `ox_commands` (a
+  two-command pack, not a library — documented as a pattern to copy). Verification now covers
+  220 symbols, up from 204, including a TypeScript walker because ox_banking is written in TS.
+
+- **`docs/hooks.md`** — all 16 hook events with their matchers, the FiveM console-error
+  catalogue and what each signature actually means, and how to switch any of them off. They
+  were previously documented nowhere.
+
 ### Fixed
 
 - **The test command only worked on the author's machine.** `node --test "test/*.test.mjs"`

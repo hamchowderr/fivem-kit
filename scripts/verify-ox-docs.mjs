@@ -73,6 +73,34 @@ const readAll = (dir) =>
     })
     .join('\n');
 
+/** Same, for TypeScript sources. ox_banking is written in TS, not Lua. */
+const walkTs = (d, acc = []) => {
+  let entries = [];
+  try {
+    entries = fs.readdirSync(d, { withFileTypes: true });
+  } catch {
+    return acc;
+  }
+  for (const x of entries) {
+    const p = path.join(d, x.name);
+    if (x.isDirectory()) {
+      if (x.name !== 'node_modules') walkTs(p, acc);
+    } else if (/\.(ts|tsx|js)$/.test(x.name)) acc.push(p);
+  }
+  return acc;
+};
+
+const readAllTs = (dir) =>
+  walkTs(dir)
+    .map((f) => {
+      try {
+        return fs.readFileSync(f, 'utf8');
+      } catch {
+        return '';
+      }
+    })
+    .join('\n');
+
 const doc = (f) => {
   try {
     return fs.readFileSync(path.join(DOCS, f), 'utf8');
@@ -147,6 +175,27 @@ const targets = [
     ]),
     actual: new Set(grab(readAll(path.join(OX, 'ox_core')), /\bOx\.([A-Za-z_]\w*)/g)),
   },
+  {
+    name: 'ox_doorlock',
+    version: version('ox_doorlock'),
+    documented: grab(doc('ox-doorlock.md'), /exports\.ox_doorlock:([A-Za-z_]\w*)/g),
+    actual: new Set(grab(readAll(path.join(OX, 'ox_doorlock')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
+  },
+  {
+    name: 'ox_fuel',
+    version: version('ox_fuel'),
+    documented: grab(doc('ox-fuel.md'), /exports\.ox_fuel:([A-Za-z_]\w*)/g),
+    actual: new Set(grab(readAll(path.join(OX, 'ox_fuel')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
+  },
+  {
+    // ox_banking is TypeScript, so the .lua-only walk finds nothing — read its source
+    // directly. Without this the resource would report zero symbols and be "skipped",
+    // which under --strict is a failure rather than a silent pass.
+    name: 'ox_banking',
+    version: version('ox_banking'),
+    documented: grab(doc('ox-banking.md'), /exports\.ox_banking:([A-Za-z_]\w*)/g),
+    actual: new Set(grab(readAllTs(path.join(OX, 'ox_banking', 'src')), /exports\(\s*'([A-Za-z_]\w*)'/g)),
+  },
 ];
 
 console.log(`Verifying fivem-kit ox documentation against ${OX}\n`);
@@ -154,6 +203,7 @@ console.log(`Verifying fivem-kit ox documentation against ${OX}\n`);
 let failed = 0;
 let checked = 0;
 const skipped = [];
+const undocumentedResources = [];
 
 for (const t of targets) {
   if (t.actual.size === 0) {
@@ -165,6 +215,18 @@ for (const t of targets) {
   const undocumented = [...t.actual].filter((s) => !t.documented.includes(s));
   checked += t.documented.length;
   failed += missing.length;
+
+  // Source is present but we document nothing from it. Reporting that as "ok" is how a
+  // renamed or deleted reference file disappears silently — it was caught exactly that way
+  // when ox-extras.md was split into one file per resource.
+  if (t.documented.length === 0) {
+    undocumentedResources.push(t.name);
+    console.log(
+      `${'NONE'} ${t.name.padEnd(13)} v${t.version.padEnd(9)}   0 documented · ` +
+        `${String(t.actual.size).padStart(3)} in source — no reference file, or it stopped matching`
+    );
+    continue;
+  }
 
   const status = missing.length ? 'FAIL' : 'ok  ';
   console.log(
@@ -208,6 +270,16 @@ if (STRICT && skipped.length) {
   console.error(
     `\n${skipped.length} resource(s) had no source and went unverified: ${skipped.join(', ')}.\n` +
       'Running with --strict, so this is a failure. Check the clone step.'
+  );
+  process.exit(1);
+}
+
+if (STRICT && undocumentedResources.length) {
+  console.error(
+    `\n${undocumentedResources.length} resource(s) have source but zero documented symbols: ` +
+      `${undocumentedResources.join(', ')}.\n` +
+      'Either the reference file is missing, or it was renamed and this script still points at\n' +
+      'the old name. Running with --strict, so this is a failure rather than a quiet zero.'
   );
   process.exit(1);
 }
