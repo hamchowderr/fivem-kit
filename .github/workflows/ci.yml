@@ -65,16 +65,11 @@ jobs:
       # and the step fails for a reason that has nothing to do with the docs. Shallow clones
       # of upstream mean this checks against ox as it is TODAY, so an upstream rename shows
       # up here rather than in a user's editor.
+      # Uses the same source list as local development (scripts/sources.mjs), so CI and a
+      # developer's machine cannot disagree about what gets verified. A hand-written clone
+      # loop here is what drifted from the verifier's targets and broke the build once.
       - name: Clone ox and framework sources
-        run: |
-          mkdir -p "$RUNNER_TEMP/ox" "$RUNNER_TEMP/frameworks"
-          for r in ox_lib ox_core ox_target ox_inventory ox_doorlock ox_fuel ox_banking; do
-            git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
-          done
-          # The ESX and QBCore references are verified against their real source too.
-          git clone --depth 1 --quiet https://github.com/esx-framework/esx_core "$RUNNER_TEMP/frameworks/esx_core"
-          git clone --depth 1 --quiet https://github.com/qbcore-framework/qb-core "$RUNNER_TEMP/frameworks/qb-core"
-          git clone --depth 1 --quiet https://github.com/Qbox-project/qbx_core "$RUNNER_TEMP/frameworks/qbx_core"
+        run: node scripts/update-sources.mjs --root "$RUNNER_TEMP"
 
       # --strict: every resource must be present. Without it, a clone that produced an empty
       # directory would skip that resource and still exit 0 — a green tick on a check that
