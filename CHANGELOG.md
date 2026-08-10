@@ -10,21 +10,64 @@ expect MINOR to move faster than it would after 1.0.0.
 
 ## [0.2.0] — 2026-08-10
 
-Two additive MCP capabilities. No breaking changes, and no change to what any existing
-client already sees — hence MINOR rather than MAJOR, and MINOR rather than PATCH because
-both are new functionality rather than fixes.
+Additive throughout. Nothing breaks and no existing client sees a different response, which
+is why this is MINOR rather than MAJOR — and MINOR rather than PATCH because it is new
+functionality rather than fixes.
 
 ### Added
+
+- **Official documentation for every supported framework.** `fivemSearch` takes a `source` of
+  `kit` (the bundled, source-verified reference), `ox`, `qbcore`, `esx`, `qbox` or `fivem`.
+  Measured: ox 376KB/133 pages, QBCore 413KB/100, ESX 269KB/158, Qbox 152KB/102, FiveM
+  437KB/212. The FiveM source covers the server manual and scripting reference — convars,
+  `server.cfg`, OneSync, routing buckets, streaming — which had almost no coverage before.
+
+  Every fetch validates on **content, never status**. ESX's documentation site answers HTTP
+  200 for any path and returns its HTML homepage; a fetcher trusting the status code would
+  cache a website's navigation as API reference. Validation requires non-HTML, a plausible
+  size, and the marker term appearing often enough to be reference material. A source that
+  fails is never cached and never served. ESX, Qbox and FiveM are assembled from the markdown
+  in their documentation repositories, since none of the three publishes a usable corpus from
+  its site. None publish a license either, so nothing is redistributed — the corpus is
+  fetched onto the user's own machine, the same reasoning that keeps the natives database out
+  of the npm package.
+
+- **Audit findings become tracked issues.** `/fivem:audit` files CRITICAL and HIGH findings
+  into beads, identified by `[RULE] relative/path.lua:LINE`. Re-auditing an unfixed resource
+  files and changes nothing; a finding that disappears closes its issue, bounded to files
+  that audit actually covered; a finding that returns reopens rather than duplicating. It
+  detects rather than requires — no beads, no problem, the audit is unchanged.
 
 - **Tool annotations.** All five tools declare `readOnlyHint`, `destructiveHint` and
   `idempotentHint`, so a client can auto-approve them instead of prompting on every call.
   `openWorldHint` marks the two that reach outside the bundle — `fivemNatives` fetches the
   CitizenFX database, `fivemDetectStack` reads whatever is on disk.
+
 - **Structured tool output** (MCP 2025-06-18) on `fivemAudit` and `fivemDetectStack`. Both
   declare an `outputSchema` and return `structuredContent` alongside the existing text, so a
   client receives typed findings and a typed stack report rather than parsing prose. The text
   block is unchanged, so a client that ignores structured output is unaffected — which is
   what makes this backwards compatible.
+
+- **CI and a release gate.** Every push runs the full suite on Node 18, 20 and 22 (the
+  `engines` range was previously a promise nothing checked), plus `claude plugin validate`,
+  the ox API verification against freshly cloned upstream sources, tarball inspection and an
+  MCP smoke test over stdio. Publishing happens only from a `v*` tag, and only when the three
+  manifests agree with each other, agree with the tag, and the changelog documents that
+  version.
+
+### Fixed
+
+- **The test command only worked on the author's machine.** `node --test "test/*.test.mjs"`
+  relies on node expanding the glob itself, which older releases do not do — so the suite
+  found zero tests on Linux while passing locally.
+- **The ox API verification reported success after verifying nothing.** An empty or failed
+  clone produced "All documented ox APIs verified present" and exit 0 having checked zero
+  symbols. Verifying nothing is now a failure, and `--strict` additionally requires every
+  resource to be present.
+- **The secret scanner refused legitimate documentation.** `mysql://user:pass@localhost/db`
+  was treated as a live credential on the blocking path, so the plugin would not write its
+  own docs. Real-looking passwords are still caught.
 
 ## [0.1.0] — 2026-08-09
 
