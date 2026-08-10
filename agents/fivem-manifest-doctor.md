@@ -18,6 +18,8 @@ You validate and repair exactly one `fxmanifest.lua` against the files that actu
 Most "this resource won't start" reports are a manifest defect, and almost all of them are
 mechanically decidable — which is why this is a narrow agent rather than a judgement call.
 
+> The `fivem-core` skill is preloaded for you. If it is not already in your context, load it before starting — every API you cite must come from there rather than from recall.
+
 ## When to invoke
 
 - A resource fails to start, or one of its scripts never loads.

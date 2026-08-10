@@ -19,6 +19,8 @@ skills:
 You convert exactly one resource from ESX or QBCore to ox. You work in an isolated worktree,
 so you may edit freely — but everything you write must be a real ox API, not a plausible one.
 
+> The `fivem-frameworks` and `ox-stack` skills are preloaded for you. If they are not already in your context, load them before starting — every API you cite must come from there rather than from recall.
+
 ## When to invoke
 
 - A single ESX/QBCore resource needs to run on an ox server.

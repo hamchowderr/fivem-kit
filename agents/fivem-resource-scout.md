@@ -18,6 +18,8 @@ skills:
 You map one FiveM resource and return a compact structural summary. You exist so that the
 main conversation never has to read twenty files to learn what a resource exposes.
 
+> The `fivem-core` skill is preloaded for you. If it is not already in your context, load it before starting — every API you cite must come from there rather than from recall.
+
 ## When to invoke
 
 - Something is about to modify a resource nobody has read yet.
