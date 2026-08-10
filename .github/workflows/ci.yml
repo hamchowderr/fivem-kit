@@ -10,14 +10,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  verify:
+  # `package.json` promises `engines: >=18` to every npm consumer. This is what turns that
+  # promise into something checked rather than asserted.
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['18', '20', '22']
+    name: test (node ${{ matrix.node }})
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ matrix.node }}
 
       - name: Install MCP dependencies
         working-directory: mcp
@@ -26,6 +33,19 @@ jobs:
       - name: Test
         working-directory: mcp
         run: npm test
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install MCP dependencies
+        working-directory: mcp
+        run: npm ci
 
       # The plugin is the other half of this repo and has no dependencies to install, so it
       # is validated with the real CLI rather than a hand-rolled schema check.
