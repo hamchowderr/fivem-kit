@@ -98,10 +98,29 @@ Rules:
 
 ## 5. File the findings
 
-CRITICAL and HIGH findings are work, and work belongs in the tracker rather than in a message
-that scrolls away. If `bd` is on PATH and a beads database exists, file them — one issue per
-finding, keyed on the finding `key` so a re-audit updates instead of duplicating. Otherwise
-just report.
+CRITICAL and HIGH findings are work, and work belongs in a tracker rather than in a message
+that scrolls away.
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/beads-sync.mjs" <path> --json
+```
+
+Run it after reporting, not instead of reporting. It:
+
+- **Detects rather than requires.** If `bd` is not installed or no database answers, it says
+  so and does nothing. Most FiveM developers have never heard of beads; the audit must work
+  identically without it.
+- **Is idempotent.** Issues are identified by `[RULE] relative/path.lua:LINE`, so re-auditing
+  an unfixed resource updates nothing and files nothing. This is the property that matters —
+  an audit that spams duplicates gets switched off the same day.
+- **Closes what was fixed.** A finding that no longer appears, in a file this audit covered,
+  closes its issue. Files outside the audited path are never touched.
+- **Files CRITICAL and HIGH only** by default. Pass `--min-severity medium` to widen, or set
+  `beads_min_severity` in `.claude/fivem.local.md`.
+
+Honour the project's `beads` setting (`auto` | `on` | `off`) by passing `--mode`. Report what
+was filed, reopened and closed in one line — do not paste the issue bodies back into the
+conversation, since the whole point is that they now live somewhere durable.
 
 Report only. Do not modify files unless asked — an audit that silently rewrites code destroys
 the reviewer's ability to check it.
