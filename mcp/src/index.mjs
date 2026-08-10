@@ -19,6 +19,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 
 import { listDocs, readDocs, searchDocs, loadCorpus } from './corpus.mjs';
+import { loadRemoteCorpus, searchRemote, describeSources } from './corpus-remote.mjs';
 import { auditLua, RULE_IDS } from './audit.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -81,8 +82,16 @@ server.registerTool(
     if (!paths || paths.length === 0) {
       const docs = listDocs();
       const lines = docs.map((d) => `- ${d.path}\n    ${d.title}${d.description ? ` — ${d.description}` : ''}`);
+
+      // Say plainly which frameworks have official corpora and which do not, so a caller
+      // does not go looking for ESX docs that were never published.
+      const official = describeSources()
+        .map((s) => `- ${s.name.padEnd(7)} ${s.available ? `available — ${s.label}` : `unavailable — ${s.note}`}`)
+        .join('\n');
+
       return text(
-        `${docs.length} documentation pages available.\nCall fivemDocs again with { "paths": [...] } to read them.\n\n${lines.join('\n')}`
+        `${docs.length} documentation pages available.\nCall fivemDocs again with { "paths": [...] } to read them.\n\n${lines.join('\n')}\n\n` +
+          `Official framework documentation (search with fivemSearch { "source": ... }):\n${official}`
       );
     }
     const results = readDocs(paths);
@@ -108,17 +117,53 @@ server.registerTool(
       openWorldHint: false,
     },
     description:
-      'Keyword search across all fivem-kit documentation. Use when you know what you want to do but not which page covers it — e.g. "progress bar animation", "callback timeout", "job grade check", "stash permissions", "convert qb-target". Returns ranked pages with matching excerpts; follow up with fivemDocs for full content.',
+      'Keyword search across FiveM documentation. Use when you know what you want to do but not which page covers it — e.g. "progress bar animation", "callback timeout", "job grade check", "stash permissions", "convert qb-target". Searches the bundled fivem-kit corpus by default; pass `source` to search the framework\'s OFFICIAL documentation instead — "ox" and "qbcore" publish complete machine-readable corpora. Returns ranked results with matching excerpts.',
     inputSchema: {
       query: z.string().describe('What you are looking for, in plain words or API names.'),
       limit: z.number().int().min(1).max(20).optional().describe('Max results (default 8).'),
+      source: z
+        .enum(['kit', 'ox', 'qbcore'])
+        .optional()
+        .describe(
+          'Which corpus to search. "kit" (default) is the bundled, source-verified reference. ' +
+            '"ox" and "qbcore" fetch the framework\'s own official documentation. ESX and Qbox ' +
+            'publish no machine-readable corpus, so their coverage lives in "kit".'
+        ),
     },
   },
-  async ({ query, limit }) => {
-    const hits = searchDocs(query, limit ?? 8);
+  async ({ query, limit, source }) => {
+    const max = limit ?? 8;
+
+    if (source && source !== 'kit') {
+      const corpus = await loadRemoteCorpus(source);
+      if (!corpus.ok) {
+        // Degrade to the bundled corpus rather than failing: an upstream outage should cost
+        // the user nothing, and the hand-written reference is verified against real sources.
+        const fallback = searchDocs(query, max);
+        return text(
+          `Official ${source} documentation is unavailable (${corpus.reason}).\n` +
+            `Falling back to the bundled fivem-kit corpus — ${fallback.length} result(s):\n\n` +
+            fallback
+              .map((h) => `## ${h.path}  (${h.title})\n${h.excerpts.map((e) => indent(e.text, 6)).join('\n')}`)
+              .join('\n\n')
+        );
+      }
+      const hits = searchRemote(corpus.text, query, { limit: max });
+      if (!hits.length) {
+        return text(`No matches for "${query}" in the official ${source} documentation.`);
+      }
+      return text(
+        `${hits.length} result(s) for "${query}" in the OFFICIAL ${source} documentation` +
+          `${corpus.cached ? ' (cached)' : ''}:\n\n` +
+          hits.map((h) => `## ${h.heading}  (line ${h.line})\n${indent(h.excerpt, 4)}`).join('\n\n')
+      );
+    }
+
+    const hits = searchDocs(query, max);
     if (!hits.length) {
       return text(
-        `No matches for "${query}".\nCall fivemDocs with no arguments to see every available page.`
+        `No matches for "${query}".\nCall fivemDocs with no arguments to see every available page.\n` +
+          'To search a framework\'s official documentation instead, pass source: "ox" or "qbcore".'
       );
     }
     const out = hits
