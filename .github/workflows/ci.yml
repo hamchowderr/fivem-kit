@@ -65,18 +65,23 @@ jobs:
       # and the step fails for a reason that has nothing to do with the docs. Shallow clones
       # of upstream mean this checks against ox as it is TODAY, so an upstream rename shows
       # up here rather than in a user's editor.
-      - name: Clone ox sources
+      - name: Clone ox and framework sources
         run: |
-          mkdir -p "$RUNNER_TEMP/ox"
+          mkdir -p "$RUNNER_TEMP/ox" "$RUNNER_TEMP/frameworks"
           for r in ox_lib ox_core ox_target ox_inventory ox_doorlock ox_fuel ox_banking; do
             git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
           done
+          # The ESX and QBCore references are verified against their real source too.
+          git clone --depth 1 --quiet https://github.com/esx-framework/esx_core "$RUNNER_TEMP/frameworks/esx_core"
+          git clone --depth 1 --quiet https://github.com/qbcore-framework/qb-core "$RUNNER_TEMP/frameworks/qb-core"
 
       # --strict: every resource must be present. Without it, a clone that produced an empty
       # directory would skip that resource and still exit 0 — a green tick on a check that
       # never ran.
-      - name: Verify documented ox APIs against source
-        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox" --strict
+      - name: Verify documented APIs against source
+        env:
+          FRAMEWORK_RESOURCES: ${{ runner.temp }}/frameworks
+        run: node scripts/verify-docs.mjs "$RUNNER_TEMP/ox" --strict
 
       - name: Release gate (version consistency + changelog)
         run: node scripts/check-release.mjs

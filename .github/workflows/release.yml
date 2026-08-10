@@ -60,15 +60,19 @@ jobs:
       - name: Validate plugin manifest
         run: claude plugin validate .claude-plugin/plugin.json
 
-      - name: Clone ox sources
+      - name: Clone ox and framework sources
         run: |
-          mkdir -p "$RUNNER_TEMP/ox"
+          mkdir -p "$RUNNER_TEMP/ox" "$RUNNER_TEMP/frameworks"
           for r in ox_lib ox_core ox_target ox_inventory ox_doorlock ox_fuel ox_banking; do
             git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
           done
+          git clone --depth 1 --quiet https://github.com/esx-framework/esx_core "$RUNNER_TEMP/frameworks/esx_core"
+          git clone --depth 1 --quiet https://github.com/qbcore-framework/qb-core "$RUNNER_TEMP/frameworks/qb-core"
 
-      - name: Verify documented ox APIs against source
-        run: node scripts/verify-ox-docs.mjs "$RUNNER_TEMP/ox" --strict
+      - name: Verify documented APIs against source
+        env:
+          FRAMEWORK_RESOURCES: ${{ runner.temp }}/frameworks
+        run: node scripts/verify-docs.mjs "$RUNNER_TEMP/ox" --strict
 
       # Refuse to publish a version that already exists, rather than letting npm reject it
       # halfway through and leaving the tag looking published.

@@ -19,10 +19,25 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SCRIPT = path.join(ROOT, 'scripts', 'verify-ox-docs.mjs');
+const SCRIPT = path.join(ROOT, 'scripts', 'verify-docs.mjs');
 
+/**
+ * Run the verifier with BOTH source roots controlled.
+ *
+ * The framework root has to be pinned too, or these tests read whatever ox/ESX/QBCore
+ * checkouts happen to exist on the machine — which is exactly what broke when framework
+ * targets were added: "four empty ox checkouts" stopped meaning "nothing was verified"
+ * because the developer's real es_extended and qb-core were still being found.
+ */
 function run(...args) {
-  const r = spawnSync(process.execPath, [SCRIPT, ...args], { encoding: 'utf8', timeout: 60_000 });
+  const r = spawnSync(process.execPath, [SCRIPT, ...args], {
+    encoding: 'utf8',
+    timeout: 60_000,
+    env: {
+      ...process.env,
+      FRAMEWORK_RESOURCES: path.join(os.tmpdir(), 'fivem-kit-no-frameworks-here'),
+    },
+  });
   return { status: r.status, out: `${r.stdout ?? ''}${r.stderr ?? ''}` };
 }
 

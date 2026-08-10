@@ -1,6 +1,6 @@
 # QBCore and Qbox reference
 
-Verified against `qb-core` and `qbx_core` sources. Resource folders: `qb-core`, `qbx_core`.
+Every symbol here was read out of `qb-core` and `qbx_core` source, not recalled.
 
 ---
 
@@ -9,148 +9,281 @@ Verified against `qb-core` and `qbx_core` sources. Resource folders: `qb-core`, 
 ## Getting the object
 
 ```lua
-local QBCore = exports['qb-core']:GetCoreObject()
-
--- optionally filtered, for a smaller object
-local QBCore = exports['qb-core']:GetCoreObject({ 'Players', 'Config' })
+QBCore = exports['qb-core']:GetCoreObject()
 ```
 
-Shared data has dedicated exports too: `GetSharedItems`, `GetSharedVehicles`,
-`GetSharedWeapons`, `GetSharedJobs`, `GetSharedGangs`.
+Some older resources use `TriggerEvent('QBCore:GetObject', function(obj) QBCore = obj end)`.
+The export is current and synchronous.
 
-## Server — player
+---
+
+## Server — finding players
 
 ```lua
-local Player = QBCore.Functions.GetPlayer(source)
-if not Player then return end
+QBCore.Functions.GetPlayer(source)              -- Player object, or nil
+QBCore.Functions.GetPlayerByCitizenId(cid)
+QBCore.Functions.GetPlayerByLicense(license)
+QBCore.Functions.GetPlayerByPhone(number)
+QBCore.Functions.GetPlayerByAccount(account)
+QBCore.Functions.GetPlayerByCharInfo(property, value)
+QBCore.Functions.GetOfflinePlayerByCitizenId(cid)
 
-Player.PlayerData                  -- the whole table
-Player.PlayerData.citizenid        -- stable identifier
-Player.PlayerData.job              -- { name, label, grade = { level, name }, onduty, ... }
+QBCore.Functions.GetPlayers()                   -- server ids
+QBCore.Functions.GetQBPlayers()                 -- id -> Player map
+QBCore.Functions.GetPlayersByJob(job)
+QBCore.Functions.GetPlayersOnDuty(job)
+QBCore.Functions.GetDutyCount(job)
+QBCore.Functions.GetIdentifier(source, type)
+QBCore.Functions.GetSource(identifier)
+```
+
+`GetPlayersOnDuty` and `GetDutyCount` are the right way to reach active police or EMS — duty
+state is separate from having the job.
+
+---
+
+## The Player object
+
+Data lives on `Player.PlayerData`; actions live on `Player.Functions`.
+
+### PlayerData
+
+```lua
+Player.PlayerData.citizenid      -- the stable identity; use this for database keys
+Player.PlayerData.license
+Player.PlayerData.source
+Player.PlayerData.cid
+Player.PlayerData.name
+Player.PlayerData.charinfo       -- { firstname, lastname, birthdate, gender, phone, ... }
+Player.PlayerData.job            -- see the warning below
 Player.PlayerData.gang
+Player.PlayerData.money          -- { cash, bank, crypto }
+Player.PlayerData.items
 Player.PlayerData.metadata
-Player.PlayerData.charinfo
+Player.PlayerData.position
 ```
 
-Methods live under `Player.Functions`:
+> **`job.grade` is a TABLE, not a number.**
+>
+> ```lua
+> Player.PlayerData.job.grade        -- { name = 'sergeant', level = 3 }
+> Player.PlayerData.job.grade.level  -- 3   ← what you almost always want
+> ```
+>
+> `if job.grade >= 3` compares a table to a number and is always false. This is the single
+> most common QBCore bug in AI-written code, and it fails silently rather than erroring.
+>
+> Also on the job table: `job.name`, `job.label`, `job.onduty`, `job.isboss`,
+> `job.payment`. **`onduty` matters** — having the police job is not the same as being on duty.
+
+### Player methods
+
+> **QBCore restructured this.** Methods are now defined on a `Player` class and called with a
+> **colon**: `Player:AddMoney(...)`. The old `Player.Functions.AddMoney(...)` still works — the
+> core builds a `.Functions` table that wraps each method — but it is a compatibility shim, not
+> the current API. Most tutorials and most existing resources still use `.Functions`.
+>
+> Write the colon form in new code. Expect the dot form everywhere else.
 
 ```lua
-Player.Functions.SetJob(job, grade)
-Player.Functions.SetGang(gang, grade)
-Player.Functions.SetJobDuty(onDuty)
+Player:AddMoney(moneytype, amount, reason)      -- 'cash' | 'bank' | 'crypto'
+Player:RemoveMoney(moneytype, amount, reason)   -- returns FALSE if unaffordable
+Player:SetMoney(moneytype, amount, reason)
+Player:GetMoney(moneytype)
 
-Player.Functions.AddMoney(moneytype, amount, reason)      -- 'cash' | 'bank' | 'crypto'
-Player.Functions.RemoveMoney(moneytype, amount, reason)
-Player.Functions.SetMoney(moneytype, amount, reason)
-Player.Functions.GetMoney(moneytype)
+Player:SetJob(job, grade)
+Player:SetGang(gang, grade)
+Player:SetJobDuty(onDuty)
 
-Player.Functions.HasItem(items, amount)
-Player.Functions.GetName()
-Player.Functions.SetMetaData(key, value)
-Player.Functions.GetMetaData(key)
-Player.Functions.AddRep(rep, amount) / RemoveRep / GetRep
-Player.Functions.SetPlayerData(key, val)
-Player.Functions.UpdatePlayerData()
+Player:GetMetaData(key) / Player:SetMetaData(key, value)
+Player:GetRep(type) / Player:AddRep(type, amount) / Player:RemoveRep(type, amount)
+Player:HasItem(items, amount)
+Player:GetName()
+
+Player:SetPlayerData(key, val)
+Player:UpdateClient()
+Player:AddField(name, data) / Player:AddMethod(name, method)
+Player:Save()
+Player:Logout()
+Player:Notify(text, type, length)
 ```
 
-`AddMoney` / `RemoveMoney` return a boolean. **Check it** — `RemoveMoney` returns false
-when the player cannot afford it, and ignoring that is how QB shops give away free items.
+Every one of those is also reachable as `Player.Functions.<Name>(...)` without the receiver —
+the shim binds the player for you, which is why the dot form takes no `self`.
+
+**`RemoveMoney` returns a boolean.** It returns `false` when the player can't afford it and
+takes nothing — so calling it without checking the return is how a shop gives away goods for
+free.
+
+```lua
+if not Player:RemoveMoney('bank', price, 'shop-purchase') then
+    return -- they could not pay; do NOT hand over the item
+end
+```
+
+---
+
+## Server — items, permissions and vehicles
+
+```lua
+QBCore.Functions.CreateUseableItem(item, cb)     -- cb(source, item)
+QBCore.Functions.CanUseItem(item)
+QBCore.Functions.UseItem(source, item)
+QBCore.Functions.HasItem(source, items, amount)
+
+QBCore.Functions.AddPermission(source, permission)
+QBCore.Functions.RemovePermission(source, permission)
+QBCore.Functions.HasPermission(source, permission)
+QBCore.Functions.GetPermission(source)
+QBCore.Functions.IsWhitelisted(source)
+QBCore.Functions.IsPlayerBanned(source)
+QBCore.Functions.IsLicenseInUse(license)
+
+QBCore.Functions.CreateVehicle(source, model, coords, warp)
+QBCore.Functions.CreateAutomobile(source, model, coords, warp)
+QBCore.Functions.SpawnVehicle(source, model, coords, warp)
+QBCore.Functions.DeleteVehicle(vehicle)          -- client
+
+QBCore.Functions.SetPlayerBucket(source, bucket)
+QBCore.Functions.SetEntityBucket(entity, bucket)
+QBCore.Functions.GetPlayersInBucket(bucket)
+QBCore.Functions.GetEntitiesInBucket(bucket)
+
+QBCore.Functions.Kick(source, reason, setKickReason, deferrals)
+QBCore.Functions.Notify(source, text, type, length)
+```
+
+**Permission is `HasPermission`, not the job.** Gating an admin command on
+`job.name == 'police'` is authority-by-employment and is SEC-7 territory.
+
+---
 
 ## Callbacks
 
 ```lua
--- server
-QBCore.Functions.CreateCallback('myresource:getSomething', function(source, cb, arg)
-    cb(result)
+-- SERVER
+QBCore.Functions.CreateCallback('myresource:getStock', function(source, cb, item)
+    cb(Stock[item])                              -- you MUST call cb
 end)
 
--- client
-QBCore.Functions.TriggerCallback('myresource:getSomething', function(result)
-end, arg)
+-- CLIENT
+QBCore.Functions.TriggerCallback('myresource:getStock', function(stock)
+    print(stock)
+end, 'bread')
 ```
+
+Like ESX, QBCore callbacks are **callback-style**: the handler calls `cb(...)` rather than
+returning. There is also `CreateClientCallback` / `TriggerClientCallback` for the reverse
+direction.
+
+---
 
 ## Client
 
 ```lua
-local PlayerData = QBCore.Functions.GetPlayerData()
-QBCore.Functions.Notify('message', 'success', 5000)
+QBCore.Functions.GetPlayerData()                 -- cached PlayerData
+QBCore.Functions.Notify(text, type, length)
 QBCore.Functions.Progressbar(name, label, duration, useWhileDead, canCancel, disableControls, animation, prop, propTwo, onFinish, onCancel)
-QBCore.Functions.SpawnVehicle(model, cb, coords, isnetworked)
-QBCore.Functions.GetClosestPlayer()
+QBCore.Functions.TriggerCallback(name, cb, ...)
+
+QBCore.Functions.GetClosestPlayer(coords)        -- returns player, distance
+QBCore.Functions.GetClosestVehicle(coords)
+QBCore.Functions.GetClosestPed(coords, ignoreList)
+QBCore.Functions.GetClosestObject(coords)
+QBCore.Functions.GetClosestBone(entity, list)
+QBCore.Functions.GetBoneDistance(entity, boneType, bone)
+
 QBCore.Functions.GetVehicleProperties(vehicle)
+QBCore.Functions.SetVehicleProperties(vehicle, props)
+QBCore.Functions.GetPlate(vehicle) / GetVehicleLabel(vehicle)
+QBCore.Functions.SpawnVehicle(model, cb, coords, isnetworked, teleport)
+QBCore.Functions.DeleteVehicle(vehicle)
+
+QBCore.Functions.LoadModel(model) / LoadAnimSet(set) / RequestAnimDict(dict)
+QBCore.Functions.PlayAnim(animDict, animName, upperbodyOnly, duration)
+QBCore.Functions.AttachProp(...) / LookAtEntity(...)
+QBCore.Functions.StartParticleAtCoord(...) / StartParticleOnEntity(...)
+QBCore.Functions.DrawText(x, y, width, height, scale, r, g, b, a, text)
+QBCore.Functions.GetStreetNametAtCoords(coords)  -- note the typo, it is in the API
+QBCore.Functions.GetZoneAtCoords(coords)
+QBCore.Functions.GetCardinalDirection()
+QBCore.Functions.GetCurrentTime()
 ```
+
+`GetStreetNametAtCoords` is misspelled **in QBCore itself**. Spelling it correctly gives you
+a nil function.
+
+---
 
 ## Events
 
-| Event | Fires |
-|---|---|
-| `QBCore:Server:OnPlayerLoaded` | player finished loading |
-| `QBCore:Client:OnPlayerLoaded` | client side of the same |
-| `QBCore:Server:OnPlayerUnload` | logout |
-| `QBCore:Client:OnJobUpdate` | job changed |
-| `QBCore:Client:OnGangUpdate` | gang changed |
+```lua
+'QBCore:Server:OnPlayerLoaded'
+'QBCore:Client:OnPlayerLoaded'
+'QBCore:Server:OnPlayerUnload' / 'QBCore:Client:OnPlayerUnload'
+'QBCore:Server:UpdateObject' / 'QBCore:Client:UpdateObject'
+'QBCore:Player:SetPlayerData'
+'QBCore:Client:OnJobUpdate' / 'QBCore:Client:OnGangUpdate'
+'QBCore:Notify'
+```
+
+---
 
 ## QBCore traps
 
-- **`job.grade` is a table** — `job.grade.level` is the number. `if job.grade >= 2` is
-  always comparing a table and silently wrong.
-- **`PlayerData` on the client is a cached copy.** It goes stale; never authorise from it.
-- **`HasItem` on the client is display-only.** Re-check server-side.
-- Money types are strings; a typo (`'Bank'`, `'money'`) fails silently in some builds
-  rather than erroring.
+**`job.grade` is a table.** `job.grade.level` is the number. This is the big one.
+
+**`RemoveMoney` returns a boolean.** Ignoring it gives away goods for free.
+
+**Duty is not employment.** `job.onduty` gates active work; `job.name` only says who employs
+them.
+
+**Permission is not the job.** Use `HasPermission`, not a job-name comparison.
+
+**`citizenid` is the stable key.** `source` changes every session; `license` is per-account.
+Database rows key on `citizenid`.
+
+**`GetStreetNametAtCoords` is misspelled upstream.** Copy the typo.
 
 ---
 
 # Qbox (qbx_core)
 
-A modernised QBCore fork. The key difference: **Qbox is built on ox_lib and ox_target**,
-so `lib.callback`, `lib.notify`, `lib.progressBar` and `ox_target` are the idiomatic
-choice there — not the QBCore equivalents.
+Qbox is a **hybrid**: `qbx_core` for players and jobs, but ox_lib, ox_target and often
+ox_inventory for everything else. Writing pure QBCore for a Qbox server misses half the stack;
+writing pure ox misses the player layer.
 
-## Server exports
-
-Called directly on the resource, no core object:
+## Server
 
 ```lua
-local player = exports.qbx_core:GetPlayer(source)
+exports.qbx_core:GetPlayer(source)
 exports.qbx_core:GetPlayerByCitizenId(citizenid)
-exports.qbx_core:GetPlayerByUserId(userId)
-exports.qbx_core:GetPlayerByPhone(phone)
+exports.qbx_core:GetPlayers()
 exports.qbx_core:GetQBPlayers()
-exports.qbx_core:GetSource(identifier)
-exports.qbx_core:GetUserId(source)
-
-exports.qbx_core:GetDutyCountJob(job)
-exports.qbx_core:GetDutyCountType(type)
-
 exports.qbx_core:CreateUseableItem(item, cb)
-exports.qbx_core:CanUseItem(item)
-
-exports.qbx_core:IsWhitelisted(source)
-exports.qbx_core:AddPermission(source, permission)
-exports.qbx_core:RemovePermission(source, permission)
-exports.qbx_core:HasPermission(source, permission)
+exports.qbx_core:AddMoney(source, moneytype, amount, reason)
+exports.qbx_core:RemoveMoney(source, moneytype, amount, reason)
 ```
 
-Routing buckets are first-class in Qbox:
+The player object keeps QBCore's shape — `PlayerData.job.grade` is still a table with
+`.level` — so the QBCore traps above apply unchanged.
+
+## Everything else is ox
 
 ```lua
-exports.qbx_core:SetPlayerBucket(source, bucket)
-exports.qbx_core:SetEntityBucket(entity, bucket)
-exports.qbx_core:GetPlayersInBucket(bucket)
-exports.qbx_core:GetEntitiesInBucket(bucket)
-exports.qbx_core:GetBucketObjects()
+lib.callback.register('resource:getThing', function(source, arg) return value end)  -- returns!
+lib.notify({ description = 'text' })
+lib.progressBar({ duration = 5000, label = 'Working' })
+exports.ox_target:addBoxZone({ ... })
+exports.ox_inventory:AddItem(source, item, count)
 ```
 
-The returned player object keeps the QBCore shape — `player.PlayerData`,
-`player.Functions.SetJob(...)` — so QBCore knowledge mostly transfers.
+**ox callbacks return; QBCore callbacks call `cb`.** On a Qbox server you will write both
+styles in the same resource — `lib.callback.register` returns a value, while anything still
+going through `qbx_core` may not.
 
 ## Writing for Qbox
 
-- Use `lib.callback` rather than `QBCore.Functions.CreateCallback`.
-- Use `lib.notify` / `lib.progressBar` rather than the QB equivalents.
-- Use `ox_target`, not `qb-target`.
-- Keep `exports.qbx_core:` for player, permission and bucket operations.
-
-This is why Qbox code reads as a hybrid — that is the intended style, not a mistake to
-"fix".
+Detect it properly: `qbx_core` present means Qbox, even though `qb-core` compatibility shims
+may also be installed. Use `qbx_core` exports for players and money, ox_lib for callbacks,
+notifications and UI, and ox_target for interaction. See `ox-stack/` for the ox half.

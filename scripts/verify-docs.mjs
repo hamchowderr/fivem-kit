@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
- * Verify every ox API symbol documented in fivem-kit actually exists in the installed
- * ox sources.
+ * Verify that every API symbol fivem-kit documents actually exists in the real source —
+ * across the ox stack, es_extended and qb-core.
  *
  * A wrong signature in a documentation product is worse than a missing one: it sends the
  * reader (or the model) confidently in the wrong direction. ox ships fast, so this check
  * is meant to be re-run whenever the reference clones are updated.
  *
  * Usage:
- *   node scripts/verify-ox-docs.mjs [pathToOxResources] [--strict]
+ *   node scripts/verify-docs.mjs [pathToOxResources] [--strict]
  *
  * `pathToOxResources` is a directory containing ox_lib/, ox_core/, ox_target/ and
  * ox_inventory/ checkouts. Defaults to $OX_RESOURCES, else ../fivem-resources/ox.
@@ -39,6 +39,25 @@ const OX =
   ARGS.find((a) => !a.startsWith('--')) ||
   process.env.OX_RESOURCES ||
   path.resolve(REPO, '..', 'fivem-resources', 'ox');
+
+/**
+ * Framework sources, for the ESX and QBCore references.
+ *
+ * Optional: a checkout that only has the ox resources still verifies those, and the framework
+ * targets report NONE rather than failing the whole run — unless --strict, where a missing
+ * source is a clone problem worth failing on.
+ */
+const FRAMEWORKS =
+  process.env.FRAMEWORK_RESOURCES || path.resolve(REPO, '..', 'fivem-resources', 'frameworks');
+
+const FW_DOCS = path.join(REPO, 'skills', 'fivem-frameworks', 'references');
+const fwDoc = (f) => {
+  try {
+    return fs.readFileSync(path.join(FW_DOCS, f), 'utf8');
+  } catch {
+    return '';
+  }
+};
 
 /**
  * Symbols the extraction regexes pick up that are not APIs.
@@ -115,7 +134,7 @@ const clean = (list) => list.filter((s) => !NOT_SYMBOLS.has(s));
 
 if (!fs.existsSync(OX)) {
   console.error(`ox sources not found at ${OX}`);
-  console.error('Clone the ox resources, or pass the path: node scripts/verify-ox-docs.mjs <dir>');
+  console.error('Clone the ox resources, or pass the path: node scripts/verify-docs.mjs <dir>');
   process.exit(2);
 }
 
@@ -198,7 +217,67 @@ const targets = [
   },
 ];
 
-console.log(`Verifying fivem-kit ox documentation against ${OX}\n`);
+/* ------------------------------------------------------- frameworks ------- */
+
+// es_extended lives under a bracketed directory, which is a glob character in most tools —
+// resolve it as a plain path rather than matching it.
+const ESX_SRC = path.join(FRAMEWORKS, 'esx_core', '[core]', 'es_extended');
+const esxSrc = readAll(ESX_SRC);
+const qbSrc = readAll(path.join(FRAMEWORKS, 'qb-core'));
+
+if (fs.existsSync(ESX_SRC)) {
+  targets.push({
+    name: 'es_extended',
+    version: 'framework',
+    // xPlayer methods are documented as `xPlayer.method(`. es_extended defines them BOTH
+    // ways — `self.method = function` and `function self.method(` — so both are collected
+    // separately rather than as one alternation, since `grab` only reads capture group 1.
+    documented: grab(fwDoc('esx.md'), /\bxPlayer\.([A-Za-z_]\w*)\s*\(/g),
+    actual: new Set([
+      ...grab(esxSrc, /\bself\.([A-Za-z_]\w*)\s*=\s*function/g),
+      ...grab(esxSrc, /\bfunction\s+self\.([A-Za-z_]\w*)/g),
+    ]),
+  });
+  targets.push({
+    name: 'ESX.*',
+    version: 'framework',
+    documented: grab(fwDoc('esx.md'), /\bESX\.([A-Za-z_]\w*)\s*\(/g),
+    actual: new Set([
+      ...grab(esxSrc, /^function ESX\.([A-Za-z_]\w*)/gm),
+      ...grab(esxSrc, /\bESX\.([A-Za-z_]\w*)\s*=/g),
+    ]),
+  });
+}
+
+if (fs.existsSync(path.join(FRAMEWORKS, 'qb-core'))) {
+  targets.push({
+    name: 'QBCore.Functions',
+    version: 'framework',
+    documented: grab(fwDoc('qbcore.md'), /\bQBCore\.Functions\.([A-Za-z_]\w*)/g),
+    actual: new Set(grab(qbSrc, /function QBCore\.Functions\.([A-Za-z_]\w*)/g)),
+  });
+  // Player methods are defined on a class with a colon — `function Player:AddMoney(...)` —
+  // and a `.Functions` table is built from two name lists as a compatibility shim. Both the
+  // colon form and the dot form are documented, so both are collected here. Reading only the
+  // old `self.Functions.X =` pattern reported 1 method against upstream, which is what caught
+  // that the local checkout was seven months stale.
+  targets.push({
+    name: 'Player methods',
+    version: 'framework',
+    documented: uniq([
+      ...grab(fwDoc('qbcore.md'), /\bPlayer:([A-Za-z_]\w*)\s*\(/g),
+      ...grab(fwDoc('qbcore.md'), /\bPlayer\.Functions\.([A-Za-z_]\w*)/g),
+    ]),
+    actual: new Set([
+      ...grab(qbSrc, /\bfunction\s+Player:([A-Za-z_]\w*)/g),
+      ...grab(qbSrc, /\bfunction\s+self\.Functions\.([A-Za-z_]\w*)/g),
+      // the varargMethods / noargMethods shim lists
+      ...grab(qbSrc, /'([A-Za-z_]\w*)'/g).filter((n) => /^(Get|Set|Add|Remove|Has|Save|Logout|Notify|Update)/.test(n)),
+    ]),
+  });
+}
+
+console.log(`Verifying fivem-kit documentation against ox sources at ${OX}\n`);
 
 let failed = 0;
 let checked = 0;
@@ -285,5 +364,5 @@ if (STRICT && undocumentedResources.length) {
 }
 
 console.log(
-  `All documented ox APIs verified present${skipped.length ? ` (${skipped.length} resource(s) skipped)` : ''}.`
+  `All documented APIs verified present${skipped.length ? ` (${skipped.length} resource(s) skipped)` : ''}.`
 );

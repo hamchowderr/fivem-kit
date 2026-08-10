@@ -171,11 +171,11 @@ player state and money desync, and it changes what generated code should target.
 The parts that don't care what you run — the security audit, the native database, server health
 checks, console-error explanations, manifest repair — work identically on all of them.
 
-> **Where ox gets more attention, stated plainly:** the bundled hand-written reference is
-> deepest on ox, and `/fivem:convert` migrates *toward* ox rather than between arbitrary pairs.
-> If you run ESX or QBCore and have no interest in migrating, everything else still applies —
-> and the **official documentation for all five** is searchable at equal depth. Thickening the
-> ESX and QBCore references is the top open item.
+> **On ox:** `/fivem:convert` migrates *toward* ox rather than between arbitrary pairs, which
+> is the one genuinely ox-directional feature. Everything else treats the frameworks equally —
+> the bundled ESX and QBCore references are comparable in depth to the ox ones, every symbol in
+> all of them is verified against real upstream source in CI, and the **official documentation
+> for all five** is searchable.
 
 ---
 
@@ -398,13 +398,12 @@ public APIs and generates code that calls them at arm's length.
 ## Contributing
 
 Corrections to the API references are especially welcome — these frameworks move fast, and a
-wrong signature in here is worse than a missing one. The most valuable area right now is
-**ESX and QBCore depth**: the bundled reference is thinner there than on ox, and most live
-servers run one of them.
+wrong signature in here is worse than a missing one.
 
 Open an issue or PR with the resource version you verified against. CI runs the full suite on
-Node 18/20/22, validates both plugin manifests, and checks all 220 documented ox symbols
-against freshly cloned upstream sources.
+Node 18/20/22, validates both plugin manifests, and checks all **387 documented symbols** —
+across the ox stack, `es_extended` and `qb-core` — against freshly cloned upstream sources. A
+correction that survives that check is one everyone can trust.
 
 ## License
 
