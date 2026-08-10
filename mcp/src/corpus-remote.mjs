@@ -77,7 +77,84 @@ export const REMOTE_SOURCES = {
     minBytes: 100_000,
     note: 'Qbox publishes no llms-full.txt (404). fivem-kit falls back to its own Qbox reference.',
   },
+  fivem: {
+    label: 'FiveM / Cfx.re — official',
+    marker: /RegisterNetEvent|GetConvar|fx_version|OneSync|resource/g,
+    minHits: 50,
+    minBytes: 150_000,
+    build: buildFivemCorpus,
+    source: 'https://github.com/citizenfx/fivem-docs',
+  },
 };
+
+/**
+ * The FiveM documentation is not published as a corpus — `docs.fivem.net` is a Hugo site
+ * with no `llms.txt` and no sitemap. The markdown behind it lives in `citizenfx/fivem-docs`,
+ * which publishes NO license, so it is fetched at runtime and never redistributed — the same
+ * reasoning that keeps the natives database out of the npm package.
+ *
+ * Only the sections that fill a real gap are fetched. `game-references` is deliberately
+ * excluded: it is 1.3 MB of weapon and vehicle hash tables, which the natives database
+ * already covers better, and it would quadruple the download for material nobody greps here.
+ */
+const FIVEM_SECTIONS = ['server-manual', 'scripting-manual', 'scripting-reference', 'cookbook'];
+
+const RAW = 'https://raw.githubusercontent.com/citizenfx/fivem-docs/master/';
+const TREE = 'https://api.github.com/repos/citizenfx/fivem-docs/git/trees/master?recursive=1';
+
+/** Fetch with bounded concurrency — 188 files at once would be rude and get us throttled. */
+async function fetchAll(paths, fetchImpl, concurrency = 8) {
+  const out = new Array(paths.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, paths.length) }, async () => {
+      while (next < paths.length) {
+        const i = next++;
+        try {
+          const r = await fetchImpl(RAW + paths[i], { headers: { 'user-agent': 'fivem-kit' } });
+          out[i] = r.ok ? await r.text() : '';
+        } catch {
+          out[i] = '';
+        }
+      }
+    })
+  );
+  return out;
+}
+
+/**
+ * Assemble the FiveM corpus: enumerate once via the git tree API (one request, so the
+ * unauthenticated 60/hour API limit is a non-issue), then pull the files from
+ * raw.githubusercontent, which is not subject to that limit.
+ */
+async function buildFivemCorpus(fetchImpl = fetch) {
+  const res = await fetchImpl(TREE, { headers: { 'user-agent': 'fivem-kit' } });
+  if (!res.ok) throw new Error(`tree listing -> HTTP ${res.status}`);
+  const tree = await res.json();
+  if (tree.truncated) throw new Error('tree listing was truncated; refusing a partial corpus');
+
+  const paths = (tree.tree || [])
+    .filter(
+      (e) =>
+        e.type === 'blob' &&
+        e.path.endsWith('.md') &&
+        FIVEM_SECTIONS.some((s) => e.path.startsWith(`content/docs/${s}/`))
+    )
+    .map((e) => e.path)
+    .sort();
+
+  if (!paths.length) throw new Error('no markdown found in the expected sections');
+
+  const bodies = await fetchAll(paths, fetchImpl);
+  const parts = [];
+  for (let i = 0; i < paths.length; i++) {
+    if (!bodies[i]) continue;
+    // A `# path` heading per file so search reports which page a hit came from.
+    const title = paths[i].replace('content/docs/', '').replace(/\.md$/, '');
+    parts.push(`# ${title}\n\n${bodies[i]}`);
+  }
+  return parts.join('\n\n---\n\n');
+}
 
 function cacheDir() {
   if (process.env.FIVEM_CACHE_DIR) return process.env.FIVEM_CACHE_DIR;
@@ -152,11 +229,16 @@ export async function loadRemoteCorpus(name, { refresh = false, fetchImpl = fetc
 
   let text;
   try {
-    const res = await fetchImpl(source.url, { headers: { 'user-agent': 'fivem-kit' } });
-    if (!res.ok) {
-      return { ok: false, name, reason: `HTTP ${res.status}${source.note ? ` — ${source.note}` : ''}` };
+    if (source.build) {
+      // Assembled from many files rather than served as one. Same validation applies.
+      text = await source.build(fetchImpl);
+    } else {
+      const res = await fetchImpl(source.url, { headers: { 'user-agent': 'fivem-kit' } });
+      if (!res.ok) {
+        return { ok: false, name, reason: `HTTP ${res.status}${source.note ? ` — ${source.note}` : ''}` };
+      }
+      text = await res.text();
     }
-    text = await res.text();
   } catch (e) {
     return { ok: false, name, reason: `fetch failed: ${e.message}` };
   }

@@ -149,9 +149,57 @@ describe('source inventory', () => {
     const byName = Object.fromEntries(sources.map((s) => [s.name, s]));
     assert.equal(byName.ox.available, true);
     assert.equal(byName.qbcore.available, true);
+    assert.equal(byName.fivem.available, true);
     assert.equal(byName.esx.available, false);
     assert.match(byName.esx.note, /single-page app/);
     assert.equal(byName.qbox.available, false);
+  });
+});
+
+describe('the FiveM corpus is assembled, not served', () => {
+  /** A fetch that answers the tree listing and then each raw markdown file. */
+  const fakeRepo = ({ truncated = false, tree = null } = {}) => async (url) => {
+    if (url.includes('api.github.com')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          truncated,
+          tree: tree ?? [
+            { type: 'blob', path: 'content/docs/server-manual/setting-up-a-server.md' },
+            { type: 'blob', path: 'content/docs/scripting-manual/networking.md' },
+            { type: 'blob', path: 'content/docs/game-references/weapons.md' }, // must be excluded
+            { type: 'tree', path: 'content/docs/server-manual' },
+          ],
+        }),
+      };
+    }
+    return { ok: true, status: 200, text: async () => `Body of ${url.split('/').pop()}\nGetConvar OneSync\n` };
+  };
+
+  test('only the sections that fill a gap are fetched', async () => {
+    const requested = [];
+    const fetchImpl = async (url, opts) => {
+      requested.push(url);
+      return fakeRepo()(url, opts);
+    };
+    // Validation will reject this tiny body, but the point is WHICH files were requested.
+    await loadRemoteCorpus('fivem', { refresh: true, fetchImpl });
+    const raw = requested.filter((u) => u.includes('raw.githubusercontent'));
+    assert.equal(raw.length, 2, 'the two in-scope pages');
+    assert.ok(!raw.some((u) => u.includes('game-references')), 'game-references is 1.3MB of hash tables');
+  });
+
+  test('a truncated tree listing is refused rather than half-fetched', async () => {
+    const r = await loadRemoteCorpus('fivem', { refresh: true, fetchImpl: fakeRepo({ truncated: true }) });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /truncated/);
+  });
+
+  test('an empty section list is an error, not an empty corpus', async () => {
+    const r = await loadRemoteCorpus('fivem', { refresh: true, fetchImpl: fakeRepo({ tree: [] }) });
+    assert.equal(r.ok, false);
+    assert.match(r.reason, /no markdown found/);
   });
 });
 

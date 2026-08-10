@@ -103,7 +103,7 @@ describe('tool declarations', () => {
     const search = tools.find((t) => t.name === 'fivemSearch');
     const source = search.inputSchema.properties?.source;
     assert.ok(source, 'fivemSearch must accept a source');
-    assert.deepEqual([...source.enum].sort(), ['kit', 'ox', 'qbcore']);
+    assert.deepEqual([...source.enum].sort(), ['fivem', 'kit', 'ox', 'qbcore']);
   });
 });
 
