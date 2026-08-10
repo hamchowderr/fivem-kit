@@ -58,7 +58,7 @@ export const SECRET_PATTERNS = [
 
 /** Obvious placeholders. Blocking a template would be worse than useless. */
 const PLACEHOLDER =
-  /YOUR[_-]?\w*|xxx+|<[^>]+>|CHANGE[_-]?ME|placeholder|example\.com|\bfoo\b|\bbar\b|\b123456789\b|\b0{6,}\b|\bdummy\b|\btest[_-]?key\b/i;
+  /YOUR[_-]?\w*|xxx+|<[^>]+>|CHANGE[_-]?ME|placeholder|example\.com|\bfoo\b|\bbar\b|\b123456789\b|\b0{6,}\b|\bdummy\b|\btest[_-]?key\b|:(?:pass|passwd|password|secret|mypass\w*|yourpass\w*)@/i;
 
 /**
  * Find secrets in a blob of text.

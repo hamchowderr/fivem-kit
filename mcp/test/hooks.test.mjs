@@ -359,6 +359,24 @@ describe('secret detection and redaction', () => {
     assert.deepEqual(findSecrets(`local token = playerToken\nlocal password = args[1]`), []);
   });
 
+  test('a documentation connection string is not a secret', () => {
+    // Found by running this scanner over our own repo: these lines are in
+    // skills/fivem-server-ops. The MySQL pattern is on the BLOCKING path, so treating them
+    // as real would make the plugin refuse to write its own documentation.
+    for (const doc of [
+      `set mysql_connection_string "mysql://user:pass@localhost/db?charset=utf8mb4"`,
+      `mysql://username:password@127.0.0.1:3306/es_extended`,
+      `mysql://root:CHANGEME@localhost/qbcore`,
+    ]) {
+      assert.deepEqual(findSecrets(doc), [], `must not flag: ${doc}`);
+    }
+  });
+
+  test('a real-looking password in a connection string still IS a secret', () => {
+    assert.equal(findSecrets(`mysql://root:hunter2@localhost/es_extended`).length, 1);
+    assert.equal(findSecrets(`mysql://svc:Xk9zQm2Lp0@db.internal/prod`).length, 1);
+  });
+
   test('redaction masks the value but keeps the text readable', () => {
     const src = `set rcon_password SuperSecret123\nother line`;
     const { text, count } = redact(src);
