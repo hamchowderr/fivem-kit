@@ -63,7 +63,7 @@ jobs:
       - name: Clone ox sources
         run: |
           mkdir -p "$RUNNER_TEMP/ox"
-          for r in ox_lib ox_core ox_target ox_inventory; do
+          for r in ox_lib ox_core ox_target ox_inventory ox_doorlock ox_fuel ox_banking; do
             git clone --depth 1 --quiet "https://github.com/overextended/$r" "$RUNNER_TEMP/ox/$r"
           done
 
