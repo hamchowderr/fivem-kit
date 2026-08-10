@@ -21,7 +21,7 @@ rules, the exploit patterns, and a working picture of the server you actually ru
 [![CI](https://github.com/hamchowderr/fivem-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/hamchowderr/fivem-kit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/fivem-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/fivem-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Node: 18+](https://img.shields.io/badge/node-18%2B-339933?logo=node.js&logoColor=white)](#-requirements)
+[![Node: 20+](https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white)](#-requirements)
 [![MCP: 2025-11-25](https://img.shields.io/badge/MCP-2025--11--25-000)](https://modelcontextprotocol.io)
 [![Frameworks: ESX · QBCore · Qbox · ox](https://img.shields.io/badge/ESX%20·%20QBCore%20·%20Qbox%20·%20ox-supported-4c8bf5)](#-works-with-your-stack)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/FVwPAsZZJ)
@@ -54,7 +54,7 @@ If your tool speaks MCP, the server works there. If it doesn't, neither half wil
 
 ### Requirements
 
-**Node.js 18+** — tested on 18, 20 and 22 in CI. That's the whole list.
+**Node.js 20+** — tested on 20, 22 and 24 in CI. That's the whole list.
 
 No FiveM server is needed to use the documentation or the natives; the stack detector and
 `/fivem:doctor` need a server folder to look at. The natives database and the official
@@ -405,7 +405,7 @@ Corrections to the API references are especially welcome — these frameworks mo
 wrong signature in here is worse than a missing one.
 
 Open an issue or PR with the resource version you verified against. CI runs the full suite on
-Node 18/20/22, validates both plugin manifests, and checks all **497 documented symbols** —
+Node 20/22/24, validates both plugin manifests, and checks all **497 documented symbols** —
 across the ox stack, `oxmysql`, `es_extended`, `qb-core`, `qbx_core`, and every native name
 against the official natives database — against freshly cloned upstream sources. A correction
 that survives that check is one everyone can trust.

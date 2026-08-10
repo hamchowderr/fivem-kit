@@ -10,19 +10,25 @@ on:
   workflow_dispatch:
 
 jobs:
-  # `package.json` promises `engines: >=18` to every npm consumer. This is what turns that
+  # `package.json` promises `engines: >=20` to every npm consumer. This is what turns that
   # promise into something checked rather than asserted.
+  #
+  # The floor tracks Node's actual support window rather than sitting still. 18 went EOL on
+  # 2025-04-30 and was still in this matrix a year later — a green tick asserting support for
+  # a runtime that receives no security patches, which is a claim we could not honour if it
+  # broke. 20 (EOL 2026-04-30) stays as a grace tier because installed editors still ship it;
+  # 24 is LTS to 2028 and is where people are moving.
   test:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        node: ['18', '20', '22']
+        node: ['20', '22', '24']
     name: test (node ${{ matrix.node }})
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node }}
 
@@ -37,9 +43,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
 

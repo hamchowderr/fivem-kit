@@ -49,7 +49,7 @@ functionality rather than fixes.
   block is unchanged, so a client that ignores structured output is unaffected — which is
   what makes this backwards compatible.
 
-- **CI and a release gate.** Every push runs the full suite on Node 18, 20 and 22 (the
+- **CI and a release gate.** Every push runs the full suite on Node 20, 22 and 24 (the
   `engines` range was previously a promise nothing checked), plus `claude plugin validate`,
   the ox API verification against freshly cloned upstream sources, tarball inspection and an
   MCP smoke test over stdio. Publishing happens only from a `v*` tag, and only when the three
@@ -100,6 +100,22 @@ functionality rather than fixes.
 - **`docs/hooks.md`** — all 16 hook events with their matchers, the FiveM console-error
   catalogue and what each signature actually means, and how to switch any of them off. They
   were previously documented nowhere.
+
+### Changed
+
+- **The supported Node range moved to `>=20`**, tested on 20, 22 and 24. Node 18 went EOL on
+  2025-04-30 and was still both the `engines` floor and a CI job, which is a support claim for
+  a runtime that receives no security patches — and a green tick asserting it. 20 stays as the
+  floor rather than 22 because installed editors still ship it; 24 is LTS to 2028 and is where
+  people are moving. This is stricter than the MCP SDK's own `>=18`, deliberately.
+
+  A raised `engines` floor is a compatibility change for anyone still on 18. It lands here
+  rather than in a later release precisely because 0.2.0 has not shipped yet.
+
+- **GitHub Actions pinned to v7** (`actions/checkout`, `actions/setup-node`), three majors on
+  from v4. v4 declares `runs.using: node20`, which GitHub is retiring — the runner was already
+  force-running them on node24 and warning about it. Unrelated to the range above: that
+  version governs the runtime the actions' own JavaScript executes on, not our package.
 
 ### Fixed
 
