@@ -1,0 +1,98 @@
+name: Release
+
+# Publishing happens from a TAG, never from a working tree.
+#
+# That is the whole point of this file. `npm publish` run locally ships whatever happens to be
+# on disk — uncommitted edits, a stale corpus, a version that does not match any commit. npm
+# unpublish is restricted after 72 hours, so there is no taking it back. Publishing from a tag
+# means the artefact is reproducible: `git checkout v0.2.0` gives back exactly what shipped.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.2.0)'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write # npm provenance — signs the package with a link back to this workflow run
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Resolve the version from the tag
+        id: version
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      # The gate. Manifests must agree with each other AND with the tag, and the changelog
+      # must document this version. A tag that disagrees with the code is the single easiest
+      # way to publish something nobody can reproduce.
+      - name: Release gate
+        run: node scripts/check-release.mjs --expect "${{ steps.version.outputs.version }}"
+
+      - name: Install MCP dependencies
+        working-directory: mcp
+        run: npm ci
+
+      - name: Test
+        working-directory: mcp
+        run: npm test
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Validate plugin manifest
+        run: claude plugin validate .claude-plugin/plugin.json
+
+      - name: Verify documented ox APIs against source
+        run: node scripts/verify-ox-docs.mjs
+
+      # Refuse to publish a version that already exists, rather than letting npm reject it
+      # halfway through and leaving the tag looking published.
+      - name: Refuse to republish an existing version
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          if npm view "fivem-mcp@$V" version >/dev/null 2>&1; then
+            echo "fivem-mcp@$V is already published — bump the version instead."
+            exit 1
+          fi
+          echo "fivem-mcp@$V is not yet published."
+
+      - name: Publish to npm
+        working-directory: mcp
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Confirm the registry actually serves what we just sent, rather than trusting exit 0.
+      - name: Verify the published package
+        run: |
+          V="${{ steps.version.outputs.version }}"
+          for i in 1 2 3 4 5; do
+            PUBLISHED=$(npm view "fivem-mcp@$V" version 2>/dev/null || true)
+            [ "$PUBLISHED" = "$V" ] && break
+            echo "not visible yet, retrying ($i)…"; sleep 10
+          done
+          [ "$PUBLISHED" = "$V" ] || { echo "registry does not serve $V"; exit 1; }
+          echo "fivem-mcp@$V is live."
+
+      - name: Create the GitHub release
+        run: gh release create "${{ steps.version.outputs.tag }}" --title "${{ steps.version.outputs.tag }}" --notes-from-tag --verify-tag
+        env:
+          GH_TOKEN: ${{ github.token }}

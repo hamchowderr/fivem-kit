@@ -53,10 +53,13 @@ const detector = path.join(REPO_ROOT, 'scripts', 'detect-stack.mjs');
 if (fs.existsSync(detector)) {
   fs.mkdirSync(VENDOR, { recursive: true });
   fs.copyFileSync(detector, path.join(VENDOR, 'detect-stack.mjs'));
-  console.log('vendored detect-stack.mjs');
+  console.error('vendored detect-stack.mjs');
 }
 
-console.log(`corpus built: ${total} markdown files -> ${path.relative(REPO_ROOT, CORPUS)}`);
+// Progress goes to stderr, not stdout. This script runs as `prepack`, so its output is
+// interleaved with `npm pack --json` — anything on stdout corrupts that JSON and breaks any
+// tooling that parses the pack manifest.
+console.error(`corpus built: ${total} markdown files -> ${path.relative(REPO_ROOT, CORPUS)}`);
 
 if (total === 0) {
   console.error('ERROR: no documentation found. Are you running this from the repo?');
