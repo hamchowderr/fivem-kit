@@ -25,7 +25,7 @@ is ever concatenated into a shell string.
 |---|---|---|
 | `SessionStart` | `startup`, `resume`, `clear`, `compact`, `fork` | Injects your detected stack, so the dialect is never re-derived. Adds the QBCore `job.grade`-is-a-table warning when relevant |
 | `Setup` | — | Pre-fetches the natives database for CI and `--init-only` runs, so a headless job isn't downloading mid-task |
-| `UserPromptSubmit` | — | Re-injects the stack **exactly once** after an in-session compaction, then clears the marker. Not a per-prompt tax |
+| `UserPromptSubmit` | — | Re-injects the stack **exactly once** after an in-session compaction, then clears the marker |
 | `PostCompact` | `auto`, `manual` | Drops the marker the above consumes |
 | `PreToolUse` | `Write`/`Edit`/`MultiEdit` on `**/*.lua` | Refuses a write containing a live credential — Discord webhook, MySQL connection string, licence key, private key |
 | `PreToolUse` | `Write`/`Edit`/`MultiEdit` on `**/*.cfg` | Same, for `server.cfg` — where the credentials actually live |
@@ -81,7 +81,7 @@ The quick-exit guard, the JSON output contract, and the never-crash policy are w
 tested in one place. Every entry in `hooks.json` has the same shape, so an event added later
 can't accidentally get a different contract.
 
-One detail worth knowing if you write hooks yourself: a **deny decision goes to stdout with
-exit 0**, not exit 2. Exit 2 discards stdout entirely and hard-blocks with whatever is on
-stderr, losing the structured reason. Several published examples get this backwards, so there
+If you write hooks yourself: a **deny decision goes to stdout with exit 0**, not exit 2. Exit 2
+discards stdout entirely and hard-blocks with whatever is on stderr, losing the structured
+reason. Several published examples get this backwards, so there
 is an explicit test asserting the exit code is 0 on a denial.

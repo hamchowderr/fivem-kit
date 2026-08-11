@@ -3,9 +3,6 @@
 `/fivem:lsp` wires [lua-language-server](https://luals.github.io/) up to FiveM, so Lua edits
 are checked against the real signatures of every native rather than against regexes.
 
-This file exists because the design is not the obvious one, and `.lsp.json` is JSON and cannot
-explain itself.
-
 ## The three moving parts
 
 | Part | Where | Installed by |
@@ -57,10 +54,10 @@ lua-language-server has an addon system: point `Lua.workspace.userThirdParty` at
 and when it detects a matching project — the FiveM addon declares `files: ["fxmanifest.lua"]` —
 it offers to apply that addon's settings.
 
-*Offers.* The default `Ask` raises a prompt, and an agent session has nobody to answer it.
+The default `Ask` raises a prompt, and an agent session has nobody to answer it.
 
 So the definitions are loaded outright through `Lua.workspace.library` instead, and detection
-is switched off. Deterministic, and needs no answer. Upstream's own settings are not lost —
+is switched off. Upstream's own settings are not lost —
 `setup` reads them out of the addon's `config.json` and merges them into `.luarc.json`, so a
 change upstream still reaches you.
 
@@ -110,8 +107,7 @@ using twelve real directives plus one typo and one bespoke key:
 | `client_scirpts` (typo) | **caught** |
 | `pizza_topping` (bespoke metadata) | warns |
 
-That is the right trade — a rare, silenceable warning in exchange for catching a class of bug
-that otherwise costs an afternoon. To silence one, add it to your `.luarc.json`:
+To silence one, add it to your `.luarc.json`:
 
 ```json
 { "Lua.diagnostics.globals": ["pizza_topping"] }

@@ -14,9 +14,9 @@ Set up FiveM language-server support for: **$ARGUMENTS**
 
 ## What this adds
 
-The `/fivem:audit` rules are regexes. They catch what regexes catch — an unvalidated net
-event, a client-supplied price, a hardcoded webhook. They cannot know that `SetEntityCoodrs`
-is a typo, or that a native takes four arguments and got three. A language server knows both,
+The `/fivem:audit` checks read the text of a file — SQL injection, a hardcoded webhook, an
+ungated command. They cannot know that `SetEntityCoodrs` is a typo, or that a native takes four
+arguments and got three. A language server knows both,
 because it has the type definitions for all ~7,300 natives.
 
 Once this is set up, those diagnostics arrive automatically after every Lua edit — no command

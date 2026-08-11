@@ -66,7 +66,7 @@ that don't apply.
 
 Rules that need semantic judgement (is this parameter validated? is there a distance
 check?) are **not** guessed at — they come back as targeted review prompts naming the
-entry points found. A report padded with false positives buries the real finding.
+entry points found.
 
 ### `fivemNatives`
 

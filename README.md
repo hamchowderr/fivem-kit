@@ -4,9 +4,9 @@
 
 ### Turn your AI editor into a FiveM developer.
 
-AI coding tools are general-purpose out of the box — they know a little Lua and nothing about
-your server. fivem-kit gives them the whole domain: the natives, the frameworks, the manifest
-rules, the exploit patterns, and a working picture of the server you actually run.
+AI coding tools know a little Lua and nothing about your server. fivem-kit gives them the rest:
+the natives, the frameworks, the manifest rules, the exploit patterns, and a picture of the
+server you actually run.
 
 <p align="center">
   <a href="#-two-things"><strong>Two things</strong></a> ·
@@ -16,13 +16,13 @@ rules, the exploit patterns, and a working picture of the server you actually ru
   <a href="#-official-documentation"><strong>Official docs</strong></a> ·
   <a href="#-the-security-ruleset"><strong>Security</strong></a> ·
   <a href="#-serving-a-team"><strong>Serving a team</strong></a> ·
-  <a href="#-community"><strong>Discord</strong></a>
+  <a href="#-contributing"><strong>Contributing</strong></a>
 </p>
 
 [![CI](https://github.com/hamchowderr/fivem-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/hamchowderr/fivem-kit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/fivem-mcp?logo=npm&color=cb3837)](https://www.npmjs.com/package/fivem-mcp)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Node: 20+](https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white)](#-requirements)
+[![Node: 20+](https://img.shields.io/badge/node-20%2B-339933?logo=node.js&logoColor=white)](#requirements)
 [![MCP: 2025-11-25](https://img.shields.io/badge/MCP-2025--11--25-000)](https://modelcontextprotocol.io)
 [![Frameworks: ESX · QBCore · Qbox · ox](https://img.shields.io/badge/ESX%20·%20QBCore%20·%20Qbox%20·%20ox-supported-4c8bf5)](#-works-with-your-stack)
 [![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/FVwPAsZZJ)
@@ -31,74 +31,79 @@ rules, the exploit patterns, and a working picture of the server you actually ru
 
 ---
 
+## 💬 Come build with us
+
+**[Join the Discord →](https://discord.gg/FVwPAsZZJ)**
+
+A Discord for AI-assisted FiveM development — which setups hold up on a live server and which
+fall apart, where models still get FiveM wrong, and migrations worth copying. It's also where we
+post what's coming next, here and on [myRP.build](https://myrp.build).
+
+Bug reports and API corrections are welcome there or in
+[Issues](https://github.com/hamchowderr/fivem-kit/issues).
+
+---
+
 ## 🧩 Two things
 
-fivem-kit ships as **two separate products**. Take whichever fits your editor — or both.
+fivem-kit is two products. Take either, or both.
 
 | | **The Claude Code plugin** | **The MCP server** (`fivem-mcp`) |
 |---|---|---|
-| **For** | Claude Code — CLI, the Desktop app's Code tab, web, and IDE extensions | Any MCP client — Cursor, Windsurf, Claude Desktop, VS Code, Zed, Cline, and anything else that speaks the protocol |
-| **Gives you** | Commands, knowledge skills, 7 subagents, 16 hooks — **plus the MCP server**, wired up automatically | 5 tools: documentation, natives, security audit, stack detection |
+| **For** | Claude Code — CLI, the Desktop app's Code tab, web, and IDE extensions | Any MCP client — Cursor, Windsurf, Claude Desktop, VS Code, Zed, Cline |
+| **Gives you** | Commands, knowledge skills, 7 subagents, 16 hooks, plus the MCP server, wired up for you | 5 tools: documentation, natives, security audit, stack detection |
 | **Install** | `/plugin install fivem` | `npx -y fivem-mcp` |
 
-The plugin is a **superset**: installing it gives you the MCP server too, already connected.
-The MCP server on its own is the portable half — it carries the knowledge and the analysis,
-but skills, subagents and hooks are Claude Code features and don't travel.
+The plugin includes the MCP server, already connected. The server on its own works anywhere, but
+skills, subagents and hooks are Claude Code features and don't travel.
 
-If your tool speaks MCP, the server works there. If it doesn't, neither half will.
+Both halves need a tool that speaks MCP.
 
-> **Using the Claude Desktop app?** Its **Code** tab is regular Claude Code — install the
-> plugin with the marketplace commands below. The **Cowork** tab is different: it loads skills
-> and plugins from **Customize** in the sidebar, synced through your claude.ai account rather
-> than from the CLI's `~/.claude` directory, so enable fivem-kit there instead. Cowork also
-> takes MCP servers as connectors.
+> **Using the Claude Desktop app?** The **Code** tab is regular Claude Code — install the plugin
+> with the marketplace commands below. The **Cowork** tab loads skills and plugins from
+> **Customize** in the sidebar instead, so enable fivem-kit there. Cowork also takes MCP servers
+> as connectors.
 
 ### Requirements
 
-**Node.js 20+** — tested on 20, 22 and 24 in CI. That's the whole list.
+Node.js 20 or newer.
 
-No FiveM server is needed to use the documentation or the natives; the stack detector and
-`/fivem:doctor` need a server folder to look at. The natives database and the official
-documentation corpora fetch on first use and then work from cache, so after one online run
-everything works offline.
+You don't need a FiveM server for the docs or the natives. Only `/fivem:doctor` and stack
+detection need one. The natives and framework docs download the first time you use them, then
+work offline.
 
 ### It runs on your machine
 
-Everything is local by default. Your editor spawns the MCP server as a child process and talks
-to it over a pipe — nothing listens on a port, there's no account, and your code is never
-uploaded anywhere. The only network traffic is fetching public documentation from CitizenFX
-and the framework projects, and that's cached after the first run.
+Your editor runs the MCP server as a child process. Nothing listens on a port, there's no
+account, and your code is never uploaded. It only goes online to download docs from CitizenFX
+and the framework projects.
 
-**Sharing one instance with a team** is possible if you want it — see
-[Serving a team](#-serving-a-team) — but it's opt-in, and off by default.
+You can share one instance with a team if you want — see [Serving a team](#-serving-a-team) — but
+it's off by default.
 
 ---
 
 ## 🎯 What changes
 
-A general AI assistant treats FiveM as "Lua, roughly". It doesn't know that `job.grade` is a
-table in QBCore and a number in ESX, that a resource silently never starts without
-`fx_version`, that `source` is nil after a yield, or which of ~7,300 natives is the one you
-want and whether it exists on the side you're calling from.
+A general AI assistant treats FiveM as Lua with extra steps. It doesn't know that `job.grade` is
+a table in QBCore and a number in ESX, that a resource never starts without `fx_version`, that
+`source` is nil after a yield, or which of ~7,300 natives you want.
 
-Give it those, and the same model stops guessing. Concretely, it gains:
+fivem-kit gives it:
 
 - **A picture of your server.** It reads your `resources/` folder and `server.cfg` once, then
-  writes in the dialect you actually run instead of a generic blend.
-- **Real APIs.** Every symbol in the bundled reference is verified against actual resource
-  source — 497 of them, checked in CI on every push, including every native name against the
-  official natives database — and the official documentation for all five frameworks is
-  searchable in-editor.
-- **A security reviewer.** 15 FiveM-specific exploit rules, applied to code as it's written
-  rather than after a server gets drained.
-- **Specialists it can delegate to.** Seven subagents, each taking one resource, so auditing or
-  migrating a whole server fans out instead of flooding one conversation.
-- **Reflexes.** [16 hooks](docs/hooks.md) that inject your stack at session start, block a
-  committed credential before it lands, and translate FiveM console errors into causes.
+  writes in the dialect you run.
+- **Real APIs.** Every symbol in the bundled reference is checked against actual resource source
+  — 497 of them, re-checked in CI on every push. The official docs for all five frameworks are
+  searchable in your editor.
+- **A security reviewer.** 15 FiveM exploit rules, applied while the code is written.
+- **Specialists to hand work to.** Seven subagents, each taking one resource, so auditing or
+  migrating a server runs in parallel instead of filling one conversation.
+- **Reflexes.** [16 hooks](docs/hooks.md) that load your stack at session start, block a
+  committed credential, and explain FiveM console errors.
 
-The most expensive thing a general model gets wrong isn't style — it's trusting the client.
-This is the single most common shape of FiveM exploit, and it looks the same in every
-framework:
+The most common FiveM exploit is a server handler that trusts the client. It looks the same in
+every framework:
 
 ```lua
 -- ESX
@@ -119,8 +124,8 @@ RegisterNetEvent('shop:buy', function(item, price)
 end)
 ```
 
-Any player sends their own price and buys a rifle for $1. fivem-kit flags all three, and writes
-the validated version in whichever dialect your server speaks.
+Any player can send their own price and buy a rifle for $1. fivem-kit catches all three and
+writes the fixed version in your framework's dialect.
 
 ---
 
@@ -133,7 +138,7 @@ the validated version in whichever dialect your server speaks.
 /plugin install fivem
 ```
 
-Then `/fivem:init` once per project, so everything speaks your server's dialect.
+Then run `/fivem:init` once per project so everything uses your server's dialect.
 
 ### Any MCP client — the server on its own
 
@@ -143,7 +148,7 @@ Then `/fivem:init` once per project, so everything speaks your server's dialect.
 claude mcp add fivem -- npx -y fivem-mcp@latest
 ```
 
-Add `--scope user` to make it available in every project rather than just this one.
+Add `--scope user` to make it available in every project.
 
 **Codex**
 
@@ -151,8 +156,8 @@ Add `--scope user` to make it available in every project rather than just this o
 codex mcp add fivem -- npx -y fivem-mcp@latest
 ```
 
-**Cursor** — no CLI for this; write `.cursor/mcp.json` in your project, or
-`~/.cursor/mcp.json` for all of them:
+**Cursor** — no CLI for this. Write `.cursor/mcp.json` in your project, or `~/.cursor/mcp.json`
+for all of them:
 
 ```json
 {
@@ -165,39 +170,36 @@ codex mcp add fivem -- npx -y fivem-mcp@latest
 }
 ```
 
-**Windsurf, Zed, Cline, VS Code, Claude Desktop** take the same JSON — only the file location
+Windsurf, Zed, Cline, VS Code and Claude Desktop use the same JSON. Only the file location
 differs, and each one's docs say where.
 
-Check it worked by asking for something only this server knows: *"what does
+To check it worked, ask for something only this server knows: *"what does
 `exports.ox_inventory:CanCarryItem` take?"*
 
 ---
 
 ## 🧭 Works with your stack
 
-Run `/fivem:init` once (or call `fivemDetectStack` from any MCP client). It reads your
-`resources/` folder and `server.cfg`, works out what you run, and everything after that speaks
-it.
+Run `/fivem:init` once, or call `fivemDetectStack` from any MCP client. It reads your
+`resources/` folder and `server.cfg` and works out what you run.
 
 | Detected | What you get |
 |---|---|
 | **ESX Legacy** | `ESX.GetPlayerFromId`, `xPlayer` with dot syntax, named accounts, `esx_*` event conventions |
-| **QBCore** | `QBCore.Functions.GetCoreObject`, `Player.Functions.*`, and `job.grade` treated as the **table** it is — not the number everyone assumes |
-| **Qbox** | `qbx_core` for players, ox_lib and ox_target for everything else — the hybrid it actually is |
+| **QBCore** | `QBCore.Functions.GetCoreObject`, `Player.Functions.*`, and `job.grade` treated as a **table**, not a number |
+| **Qbox** | `qbx_core` for players, ox_lib and ox_target for everything else |
 | **ox** | `Ox.GetPlayer`, `lib.callback`, ox_target / ox_inventory exports |
-| **standalone** | No framework assumed; plain natives and your own state |
+| **standalone** | No framework assumed. Plain natives and your own state |
 
-It flags a **mixed install** loudly — more than one framework running at once causes duplicate
-player state and money desync, and it changes what generated code should target.
+It flags a **mixed install**, because two frameworks running at once cause duplicate player state
+and money desync.
 
-The parts that don't care what you run — the security audit, the native database, server health
-checks, console-error explanations, manifest repair — work identically on all of them.
+The security audit, native database, server health checks, console-error explanations and
+manifest repair work the same way on all of them.
 
-> **On ox:** `/fivem:convert` migrates *toward* ox rather than between arbitrary pairs, which
-> is the one genuinely ox-directional feature. Everything else treats the frameworks equally —
-> the bundled ESX and QBCore references are comparable in depth to the ox ones, every symbol in
-> all of them is verified against real upstream source in CI, and the **official documentation
-> for all five** is searchable.
+> **On ox:** `/fivem:convert` migrates *toward* ox rather than between arbitrary pairs. Everything
+> else treats the frameworks equally — the bundled ESX and QBCore references are as deep as the ox
+> ones, and the official docs for all five are searchable.
 
 ---
 
@@ -207,28 +209,29 @@ checks, console-error explanations, manifest repair — work identically on all 
 
 | Command | Does |
 |---|---|
-| `/fivem:init [path]` | Detect your stack once and record it, so every other command speaks the right dialect |
-| `/fivem:resource <name>` | Scaffold a resource in your framework — manifest, client, server, config, with server-side validation written in from the start |
-| `/fivem:audit [path]` | Security audit against a 15-rule FiveM-specific ruleset |
+| `/fivem:init [path]` | Detect your stack once and record it, so every other command uses the right dialect |
+| `/fivem:resource <name>` | Scaffold a resource in your framework — manifest, client, server, config, with server-side validation already written in |
+| `/fivem:audit [path]` | Security audit against 15 FiveM rules |
 | `/fivem:doctor [path]` | Server health check — stack, load order, dependencies, manifests, cfg traps |
 | `/fivem:natives <query>` | Look up any of ~7,300 natives, and the wrapper to use instead |
 | `/fivem:convert <path>` | Migrate an ESX or QBCore resource to ox |
-| `/fivem:lsp [path]` | Wire up lua-language-server so Lua edits get real diagnostics — see below |
+| `/fivem:lsp [path]` | Wire up lua-language-server so Lua edits get real diagnostics |
 
 ### Real diagnostics, not just rules · Claude Code
 
-The 15 security rules are regexes. They catch what regexes catch. They cannot know that
-`SetEntityCoodrs` is a typo, or that a native takes four arguments and got three.
+The automatic security checks read the text of a file. They cannot know that `SetEntityCoodrs`
+is a typo, or that a native takes four arguments and got three.
 
 `/fivem:lsp` installs [Overextended's FiveM type definitions](https://github.com/overextended/fivem-lls-addon)
-and points [lua-language-server](https://luals.github.io/) at them. After that, every Lua edit
-is checked against the real signatures of all ~7,300 natives, and the diagnostics come back
-automatically — no command to run.
+and points [lua-language-server](https://luals.github.io/) at them. After that, every Lua edit is
+checked against the real signatures of all ~7,300 natives, automatically.
 
-It needs `lua-language-server` on your PATH. Without it nothing breaks: the language server
-simply never starts, and everything else works exactly as before.
+It needs `lua-language-server` on your PATH. Without it the language server never starts and
+everything else works as before.
 
-### Knowledge skills · Claude Code — load automatically when relevant
+### Knowledge skills · Claude Code
+
+These load on their own when they're relevant.
 
 | Skill | Covers |
 |---|---|
@@ -243,36 +246,35 @@ simply never starts, and everything else works exactly as before.
 
 ### Subagents · Claude Code
 
-Each takes **one resource**, so a whole-server job fans out across them concurrently and none
-of their file reading lands in your main conversation.
+Each one takes a single resource, so a whole-server job runs across them at once and their file
+reading stays out of your main conversation.
 
 | Agent | Does |
 |---|---|
-| `fivem-security-auditor` | Audits one resource against SEC-1…15 — deterministic pass, then reads every client-reachable handler for the rules a regex can't decide |
+| `fivem-security-auditor` | Audits one resource against SEC-1…15 — automated pass first, then reads every client-reachable handler for the rules a check can't decide |
 | `fivem-resource-scout` | Read-only recon: exports, events, callbacks, dependencies, dialect, NUI surface |
-| `fivem-manifest-doctor` | Validates and repairs one `fxmanifest.lua` against the files on disk — including case mismatches that only break on Linux |
-| `fivem-native-researcher` | Exact natives and wrappers with verified signatures, never recalled |
-| `fivem-perf-auditor` | Per-frame loops, uncached natives, entity iteration, stuck NUI focus — with cost estimates |
+| `fivem-manifest-doctor` | Checks and repairs one `fxmanifest.lua` against the files on disk, including case mismatches that only break on Linux |
+| `fivem-native-researcher` | Exact natives and wrappers with verified signatures, never from memory |
+| `fivem-perf-auditor` | Per-frame loops, uncached natives, entity iteration, stuck NUI focus, with cost estimates |
 | `fivem-nui-builder` | The NUI layer for one resource: web assets, Lua bridge, `files{}`, focus lifecycle |
-| `fivem-ox-migrator` | Converts one resource ESX/QBCore → ox, in an isolated git worktree so migrators run in parallel |
+| `fivem-ox-migrator` | Converts one resource from ESX/QBCore to ox, in its own git worktree so migrators can run in parallel |
 
-`/fivem:audit` and `/fivem:convert` act as supervisors, batching specialists ~8 per message and
-merging the results.
+`/fivem:audit` and `/fivem:convert` run as supervisors, sending specialists out about 8 at a time
+and merging what comes back.
 
-For a whole-server audit you want to repeat — before a launch, on a schedule, in CI — the
-`fivem-audit-server` workflow does the same job with fixed steps instead of model-directed
-ones, so two runs over the same server do the same work. Findings are re-checked by a second
-pass that tries to disprove them, and anything it couldn't cover is named in the report rather
-than left out.
+For a whole-server audit you'll repeat — before a launch, on a schedule, in CI — the
+`fivem-audit-server` workflow does the same job with fixed steps, so two runs over the same
+server do the same work. Findings get a second pass that tries to disprove them, and anything it
+couldn't cover is named in the report.
 
 ### Hooks · Claude Code
 
-**16 events** — session context injection, credential blocking before a write, lint-on-write
-reported once per batch, console-error translation, on-screen secret masking, and context
-restoration after compaction.
+**16 events:** session context, credential blocking before a write, lint-on-write reported once
+per batch, console-error translation, on-screen secret masking, and context restored after
+compaction.
 
-Every one quick-exits when the project isn't a FiveM project, so an unrelated repo pays
-nothing, and `enabled: false` stands them all down without uninstalling anything.
+Each one exits immediately when the project isn't a FiveM project, and `enabled: false` turns
+them all off without uninstalling anything.
 
 **→ [Full reference: docs/hooks.md](docs/hooks.md)**
 
@@ -283,7 +285,7 @@ nothing, and `enabled: false` stands them all down without uninstalling anything
 | `fivemDocs` | Read documentation pages, bundled or official |
 | `fivemSearch` | Keyword search across the bundled reference or any framework's official docs |
 | `fivemNatives` | Resolve a native by name, hash, or a description of the task |
-| `fivemAudit` | Run the 15-rule security analyser over Lua source or a file |
+| `fivemAudit` | Run the security checks over Lua source or a file |
 | `fivemDetectStack` | Work out which framework and libraries a server folder runs |
 
 All five are read-only, so your editor can use them without asking permission every time.
@@ -292,7 +294,7 @@ All five are read-only, so your editor can use them without asking permission ev
 
 ## 📚 Official documentation
 
-Search the bundled reference, or your framework's **own official docs**, from the same tool:
+Search the bundled reference, or your framework's own docs, from the same tool:
 
 ```jsonc
 fivemSearch { "query": "job grade", "source": "qbcore" }
@@ -300,21 +302,21 @@ fivemSearch { "query": "job grade", "source": "qbcore" }
 
 | `source` | What it is | Size |
 |---|---|---|
-| `kit` *(default)* | The bundled reference, verified against real resource sources. Works offline | — |
+| `kit` *(default)* | The bundled reference, checked against real resource sources. Works offline | — |
 | `esx` | ESX Legacy documentation | 269 KB · 158 pages |
 | `qbcore` | docs.qbcore.org | 413 KB · 100 pages |
 | `qbox` | Qbox documentation | 152 KB · 102 pages |
 | `ox` | overextended.dev | 376 KB · 133 pages |
-| `fivem` | Cfx.re server manual + scripting reference — convars, `server.cfg`, OneSync, routing buckets, streaming | 437 KB · 212 pages |
+| `fivem` | Cfx.re server manual and scripting reference — convars, `server.cfg`, OneSync, routing buckets, streaming | 437 KB · 212 pages |
 
-These are the projects' own docs, fetched to your machine on first use and cached. Nothing is
-redistributed and nothing is scraped into a summary — you get the real pages.
+These are the projects' own docs, downloaded to your machine on first use and cached. Nothing is
+redistributed and nothing is summarised.
 
 ---
 
 ## 🔒 The security ruleset
 
-15 rules covering the flaws that actually get servers wiped — none of them framework-specific:
+15 rules covering the flaws that get servers wiped. None of them are framework-specific.
 
 | | | | |
 |---|---|---|---|
@@ -327,22 +329,34 @@ redistributed and nothing is scraped into a summary — you get the real pages.
 | SEC-7 | Unrestricted admin command | SEC-15 | NUI callback trusted |
 | SEC-8 | Secret in a client script | | |
 
-**It doesn't cry wolf.** The rules were tuned against real servers until what's left is what
-you'd actually fix — an audit you can trust is one you'll run twice. Where a rule needs human
-judgement it says so, rather than guessing and padding the report.
+They aren't all the same kind of check:
+
+| How it's checked | Which rules |
+|---|---|
+| **Automatically** | SQL injection, dynamic code execution, ungated commands, sensitive broadcasts, `source` after a yield, secrets in source — SEC-3, 5, 7, 8, 10, 12 |
+| **Read by the model** | The analyser finds the entry points and says what to check on each: unvalidated parameters, client-supplied price, missing distance check, money races, permission trusted from the UI — SEC-1, 2, 4, 6, 9 |
+| **Applied from knowledge** | Rate limiting, internal events exposed to the network, identifier trusted for authorisation, trusted NUI callback — SEC-11, 13, 14, 15 |
+
+`/fivem:audit` and the security-auditor subagent apply all 15, by reading every client-reachable
+handler. The write-time hook runs the automatic checks only, on the file you just saved — same
+rules, same finding, so the two never disagree.
+
+The analyser also checks two things that aren't security: a `while true` with no `Wait`, and
+legacy MySQL APIs.
+
+The rules were tuned against real servers until what's left is what you'd actually fix. Where a
+rule needs human judgement it says so instead of guessing.
 
 It knows each framework's spelling of the same dangerous action — ESX's `addAccountMoney`,
-QBCore's `AddMoney`, ox's `:deposit` all count as granting value — so an ungated admin command
-is caught whichever one you use. And a command is only reported when its handler actually
-grants value or control: `/job` printing your own job is not a vulnerability, and reporting it
-would bury the ones that are.
+QBCore's `AddMoney`, ox's `:deposit` all count as granting value — so an ungated admin command is
+caught whichever one you use. A command is only reported when its handler grants value or
+control — `/job` printing your own job is not.
 
 ---
 
 ## 🗂 The native database
 
-`fivemNatives` (and `/fivem:natives`) searches every native FiveM exposes — framework-agnostic
-by definition, since natives are the layer underneath all of them:
+`fivemNatives` and `/fivem:natives` search every native FiveM exposes.
 
 | | |
 |---|---|
@@ -350,20 +364,19 @@ by definition, since natives are the layer underneath all of them:
 | CFX / FiveM natives | ~943, mostly server-side |
 | Resolvable by | Lua name (`SetEntityCoords`), snake name (`SET_ENTITY_COORDS`), hash (`0x06843DA7060A026B`), or a description of the task |
 
-It knows many natives exist on **both sides** — `SetEntityCoords` is a client native *and* a
-server RPC equivalent with a different hash — and returns the right one for the script you're
-writing. Where a library wraps a native, it says so, because the wrapper handles the waiting
-and cleanup that hand-written calls skip.
+Many natives exist on **both sides** — `SetEntityCoords` is a client native and a server RPC with
+a different hash — and it returns the right one for the script you're writing. Where a library
+wraps a native, it tells you.
 
-Fetched from the official CitizenFX endpoint on first use and cached, rather than bundled — so
-it follows game builds instead of going stale. `FIVEM_CACHE_DIR` sets the cache location.
+Downloaded from the official CitizenFX endpoint on first use and cached, so it follows game
+builds instead of going stale. `FIVEM_CACHE_DIR` sets where.
 
 ---
 
 ## 🌐 Serving a team
 
-By default every developer runs their own copy. If you'd rather run one instance your whole
-team connects to — one cache, one place to update — it speaks Streamable HTTP:
+By default everyone runs their own copy. To run one instance your team connects to, it speaks
+Streamable HTTP:
 
 ```bash
 # this machine only, no token needed
@@ -386,79 +399,70 @@ FIVEM_SERVER_ROOT=/srv/fivem \
 }
 ```
 
-**It refuses to listen on a network address without a token.** Not a warning — it exits. The
-reason is `fivemDetectStack`: it reads a folder the caller names, which is harmless when your
-own editor asks and is not harmless when a stranger does, because `server.cfg` is where a
-FiveM server keeps its database password and license key.
+**It won't listen on a network address without a token — it exits rather than warning.**
+`fivemDetectStack` reads a folder the caller names, which is fine when your own editor asks and
+not fine when a stranger does, because `server.cfg` holds the database password and the license
+key.
 
-`FIVEM_SERVER_ROOT` confines that reading to one folder. Set it — the server will tell you at
-startup if you haven't.
+`FIVEM_SERVER_ROOT` limits that reading to one folder. The server tells you at startup if you
+haven't set it.
 
 ---
 
 ## ⚙️ Configuration
 
-`/fivem:init` writes `.claude/fivem.local.md` — detected server path, dialect, framework and
+`/fivem:init` writes `.claude/fivem.local.md`: the detected server path, dialect, framework and
 lib, plus per-project switches (`audit_on_write`, `remind_on_stop`, `redact_secrets`, `lsp`,
 `beads`). Add `.claude/*.local.md` to your `.gitignore`; init offers to do it.
 
-Machine-wide preferences — preferred dialect for greenfield work, a default server folder,
-audit-on-write — are prompted for when you enable the plugin and live in your user settings.
-Where both set the same thing, the project file wins, because it describes *that* server.
+Machine-wide preferences — preferred dialect for new work, a default server folder,
+audit-on-write — are asked for when you enable the plugin and live in your user settings. Where
+both set the same thing, the project file wins.
 
 > **The project file is treated as untrusted input.** It lives in the workspace, so a cloned
-> FiveM repo can ship one and the hooks read it every session. Every value is validated against
-> an allow-list, `server_path` must resolve to a real directory containing `resources/`, unknown
-> keys are dropped, parsing is bounded, and nothing from it is ever interpolated into a shell
-> command. A committed config can't do harm — and won't work on anyone else's machine either,
-> which is the intended outcome.
+> FiveM repo can ship one and the hooks read it every session. Every value is checked against an
+> allow-list, `server_path` must be a real directory containing `resources/`, unknown keys are
+> dropped, parsing is bounded, and nothing from it reaches a shell command.
 
 ---
 
-## 💬 Community
+## 🤝 Contributing
 
-**[Join the Discord →](https://discord.gg/FVwPAsZZJ)**
+Corrections to the API references are the most useful thing you can send — a wrong signature gets
+repeated confidently by every model that reads it.
 
-A community for **AI-assisted FiveM development** — building servers and resources with AI in
-the loop, and getting good at it.
+- **Found a bug?** Open a bug report with a minimal resource — the one event that misbehaves,
+  plus the full `fxmanifest.lua`.
+- **Found a wrong API?** Open an API correction, or go straight to a PR. Either way, say which
+  upstream commit you read it in.
+- **Want to build something?** Open a feature request and wait for a reply before writing it.
 
-What that looks like in practice: which setups hold up against a live server and which fall
-apart, where the models still get FiveM wrong, migrations and architecture decisions worth
-copying, and what's coming next in fivem-kit. Come to get it running, to say what it got
-wrong, or to show what you built.
+[CONTRIBUTING.md](CONTRIBUTING.md) has the guidelines, including how to prove a correction and
+where a new security rule belongs. [DEVELOPMENT.md](DEVELOPMENT.md) has setup and the five
+commands CI runs. Working on this repo with an agent? Point it at [AGENTS.md](AGENTS.md) first.
 
-Bug reports and API corrections are welcome here or in
-[Issues](https://github.com/hamchowderr/fivem-kit/issues) — whichever you'll actually do.
+One rule matters more than the rest: **never document an API from memory.** CI checks all **497
+documented symbols** against freshly cloned upstream sources, so it will find out.
+
+Maintainers ship directly to `main`. Outside contributions come as PRs from a fork.
 
 ---
 
 ## 🏗 Built by
 
-[**myRP.build**](https://myrp.build) — describe a resource in plain English and an agent
-generates it with full awareness of your server, then deploys it. fivem-kit is the free, local,
-terminal-side slice of that work.
+[**myRP.build**](https://myrp.build) — describe a resource in plain English and an agent builds it
+with full knowledge of your server, then deploys it.
+
+fivem-kit is the free slice of that work, and it lives in your editor: Claude Code, or any client
+that speaks MCP. myRP.build is the whole thing — building, testing and deploying to a running
+server, without an editor in the loop.
 
 ## Credits
 
 Built for the FiveM community and the framework teams whose public APIs it documents — **ESX
-Legacy**, **QBCore**, **Qbox**, and **ox (Overextended)** — along with **Cfx.re**, whose
-natives and server documentation underpin all of it. fivem-kit is an independent project, is
-not affiliated with or endorsed by any of them, and bundles no framework source; it documents
-public APIs and generates code that calls them at arm's length.
-
-## Contributing
-
-Corrections to the API references are especially welcome — these frameworks move fast, and a
-wrong signature in here is worse than a missing one.
-
-Open an issue or PR with the resource version you verified against. CI runs the full suite on
-Node 20/22/24, validates both plugin manifests, and checks all **497 documented symbols** —
-across the ox stack, `oxmysql`, `es_extended`, `qb-core`, `qbx_core`, and every native name
-against the official natives database — against freshly cloned upstream sources. A correction
-that survives that check is one everyone can trust.
-
-`node scripts/update-sources.mjs` refreshes every upstream clone the references are written
-from, and reports what moved.
+Legacy**, **QBCore**, **Qbox**, and **ox (Overextended)** — along with **Cfx.re**, whose natives
+and server documentation underpin all of it. fivem-kit is an independent project, is not
+affiliated with or endorsed by any of them, and bundles no framework source.
 
 ## License
 
