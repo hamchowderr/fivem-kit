@@ -259,9 +259,7 @@ nothing, and `enabled: false` stands them all down without uninstalling anything
 | `fivemAudit` | Run the 15-rule security analyser over Lua source or a file |
 | `fivemDetectStack` | Work out which framework and libraries a server folder runs |
 
-All five declare `readOnlyHint`, so a well-behaved client can call them without prompting.
-`fivemAudit` and `fivemDetectStack` also return **structured output** (MCP 2025-06-18) — typed
-findings and a typed stack report, not prose to parse.
+All five are read-only, so your editor can use them without asking permission every time.
 
 ---
 
@@ -302,11 +300,9 @@ redistributed and nothing is scraped into a summary — you get the real pages.
 | SEC-7 | Unrestricted admin command | SEC-15 | NUI callback trusted |
 | SEC-8 | Secret in a client script | | |
 
-The analyser decides the mechanical rules itself and returns targeted review prompts for the
-ones that need judgement — it doesn't pad the report with guesses.
-
 **It doesn't cry wolf.** The rules were tuned against real servers until what's left is what
-you'd actually fix — an audit you can trust is one you'll run twice.
+you'd actually fix — an audit you can trust is one you'll run twice. Where a rule needs human
+judgement it says so, rather than guessing and padding the report.
 
 It knows each framework's spelling of the same dangerous action — ESX's `addAccountMoney`,
 QBCore's `AddMoney`, ox's `:deposit` all count as granting value — so an ungated admin command
