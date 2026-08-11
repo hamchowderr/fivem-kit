@@ -21,6 +21,7 @@ import { z } from 'zod';
 import { listDocs, readDocs, searchDocs, loadCorpus } from './corpus.mjs';
 import { loadRemoteCorpus, searchRemote, describeSources } from './corpus-remote.mjs';
 import { auditLua, RULE_IDS } from './audit.mjs';
+import { serve, serverRoot, withinRoot, DEFAULT_HOST, DEFAULT_PORT } from './http.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(fs.readFileSync(path.join(HERE, '..', 'package.json'), 'utf8'));
@@ -489,7 +490,17 @@ server.registerTool(
     const detectStack = await loadDetector();
     if (!detectStack) return notFound('Stack detector unavailable in this installation.');
 
-    const r = detectStack(serverPath ?? process.cwd());
+    // Confinement, when the operator configured one. This is the tool that reads a path the
+    // caller names, which is harmless over stdio and is the whole risk over a socket — a
+    // FiveM server.cfg holds the database credentials and the license key.
+    const target = serverPath ?? process.cwd();
+    if (!withinRoot(target)) {
+      return notFound(
+        `Path is outside the configured server root. This instance is confined to ${serverRoot()}.`
+      );
+    }
+
+    const r = detectStack(target);
     if (!r.found) return notFound(`${r.error}\n\nSearched from: ${r.searchedFrom}`, r.searchedFrom);
 
     const summary = {
@@ -543,6 +554,24 @@ function indent(s, n) {
     .join('\n');
 }
 
+/**
+ * Argument parsing, kept deliberately small.
+ *
+ * Note what is NOT here: a `--token` flag. A command line is readable by every other process
+ * on the machine, so the token comes from the environment only.
+ */
+export function parseArgs(argv) {
+  const flag = (name, fallback) => {
+    const i = argv.indexOf(`--${name}`);
+    return i === -1 || i === argv.length - 1 ? fallback : argv[i + 1];
+  };
+  return {
+    http: argv.includes('--http'),
+    host: flag('host', DEFAULT_HOST),
+    port: Number(flag('port', DEFAULT_PORT)),
+  };
+}
+
 async function main() {
   // Surface a clear error if the corpus is missing rather than serving empty docs.
   const { list } = loadCorpus();
@@ -551,10 +580,44 @@ async function main() {
       '[fivem-kit] No documentation corpus found. Run `npm run build:corpus` in the mcp/ directory, or run from a full repo checkout.'
     );
   }
-  await server.connect(new StdioServerTransport());
+
+  const opts = parseArgs(process.argv.slice(2));
+
+  // stdio stays the default. HTTP is opt-in because listening on a socket is a different
+  // security posture entirely, and nobody should arrive there by upgrading.
+  if (!opts.http) {
+    await server.connect(new StdioServerTransport());
+    return;
+  }
+
+  if (!Number.isInteger(opts.port) || opts.port < 1 || opts.port > 65535) {
+    console.error(`[fivem-kit] --port must be 1-65535, got "${opts.port}"`);
+    process.exit(2);
+  }
+
+  await serve(server, { host: opts.host, port: opts.port });
 }
 
-main().catch((err) => {
-  console.error('[fivem-kit] fatal:', err);
-  process.exit(1);
-});
+/**
+ * Only start when run directly.
+ *
+ * Without this guard, importing anything from this file starts a server: `main()` ran at
+ * module load, connected the stdio transport, and never returned. A test that imported
+ * `parseArgs` hung forever with no output — and the same would happen to any consumer that
+ * imported a helper from here.
+ */
+const RUN_DIRECTLY =
+  process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+
+if (RUN_DIRECTLY) {
+  main().catch((err) => {
+    // A refused configuration is an operator mistake with a fix in the message, not a crash.
+    // Printing a stack trace over it would bury the one line that says what to do.
+    if (err?.configRefused) {
+      console.error(`[fivem-kit] ${err.message}`);
+      process.exit(2);
+    }
+    console.error('[fivem-kit] fatal:', err);
+    process.exit(1);
+  });
+}

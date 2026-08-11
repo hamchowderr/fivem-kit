@@ -135,6 +135,30 @@ functionality rather than fixes.
   every manifest in existence. A manifest may still declare arbitrary metadata; anything
   bespoke warns and is silenced with one entry in `Lua.diagnostics.globals`.
 
+- **One instance can serve a team** — `fivem-mcp --http` speaks Streamable HTTP alongside the
+  default stdio, so a server owner can run one copy their whole team connects to. No new
+  dependency; the MCP SDK already ships the transport.
+
+  The transport was the easy half. `fivemDetectStack` reads a folder the caller names — the
+  same privilege the editor already had when it spawns the process itself, and something quite
+  different once a socket is involved, because `server.cfg` is where a FiveM server keeps its
+  database password and license key. So the rules fail closed:
+
+  - Binds to `127.0.0.1` unless told otherwise.
+  - Binding anywhere else **requires** `FIVEM_MCP_TOKEN` and **exits** without one. Not a
+    warning — a warning printed at startup is read once and never again.
+  - No `--token` flag, deliberately: a command line is readable by every other process on the
+    machine. The token comes from the environment only.
+  - `FIVEM_SERVER_ROOT` confines path-reading to one folder, and its absence is reported at
+    startup when listening off-loopback.
+  - DNS-rebinding protection is on, so a web page cannot drive a server bound to a developer's
+    own loopback.
+
+  Verified against a running instance rather than reasoned about: unauthenticated requests get
+  401, a valid token gets through, `initialize` negotiates 2025-11-25 over HTTP, and a
+  `fivemDetectStack` call for `C:/Windows` against an instance confined to a server folder is
+  refused.
+
 - **A deterministic whole-server audit** — `workflows/audit-server.js`. `/fivem:audit` is a
   supervisor: the model decides how many specialists to spawn and in what order, which is
   right for a conversation and wrong for a check you run every week, because two runs over the

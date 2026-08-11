@@ -15,6 +15,7 @@ rules, the exploit patterns, and a working picture of the server you actually ru
   <a href="#-what-you-get"><strong>What you get</strong></a> ·
   <a href="#-official-documentation"><strong>Official docs</strong></a> ·
   <a href="#-the-security-ruleset"><strong>Security</strong></a> ·
+  <a href="#-serving-a-team"><strong>Serving a team</strong></a> ·
   <a href="#-community"><strong>Discord</strong></a>
 </p>
 
@@ -63,10 +64,13 @@ everything works offline.
 
 ### It runs on your machine
 
-Everything is local. Your editor spawns the MCP server as a child process and talks to it over
-a pipe — nothing listens on a port, there's no account, and your code is never uploaded
-anywhere. The only network traffic is fetching public documentation from CitizenFX and the
-framework projects, and that's cached after the first run.
+Everything is local by default. Your editor spawns the MCP server as a child process and talks
+to it over a pipe — nothing listens on a port, there's no account, and your code is never
+uploaded anywhere. The only network traffic is fetching public documentation from CitizenFX
+and the framework projects, and that's cached after the first run.
+
+**Sharing one instance with a team** is possible if you want it — see
+[Serving a team](#-serving-a-team) — but it's opt-in, and off by default.
 
 ---
 
@@ -336,6 +340,42 @@ and cleanup that hand-written calls skip.
 
 Fetched from the official CitizenFX endpoint on first use and cached, rather than bundled — so
 it follows game builds instead of going stale. `FIVEM_CACHE_DIR` sets the cache location.
+
+---
+
+## 🌐 Serving a team
+
+By default every developer runs their own copy. If you'd rather run one instance your whole
+team connects to — one cache, one place to update — it speaks Streamable HTTP:
+
+```bash
+# this machine only, no token needed
+npx fivem-mcp --http
+
+# reachable from your network — a token is required
+FIVEM_MCP_TOKEN="$(openssl rand -hex 32)" \
+FIVEM_SERVER_ROOT=/srv/fivem \
+  npx fivem-mcp --http --host 0.0.0.0 --port 3111
+```
+
+```json
+{
+  "mcpServers": {
+    "fivem": {
+      "url": "http://your-host:3111",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
+    }
+  }
+}
+```
+
+**It refuses to listen on a network address without a token.** Not a warning — it exits. The
+reason is `fivemDetectStack`: it reads a folder the caller names, which is harmless when your
+own editor asks and is not harmless when a stranger does, because `server.cfg` is where a
+FiveM server keeps its database password and license key.
+
+`FIVEM_SERVER_ROOT` confines that reading to one folder. Set it — the server will tell you at
+startup if you haven't.
 
 ---
 
