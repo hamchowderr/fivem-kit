@@ -53,9 +53,13 @@ jobs:
         working-directory: mcp
         run: npm ci
 
+      # Authenticated GitHub API access for the corpus tests — see the note in ci.yml. A
+      # release must not fail on a rate limit shared with strangers.
       - name: Test
         working-directory: mcp
         run: npm test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code

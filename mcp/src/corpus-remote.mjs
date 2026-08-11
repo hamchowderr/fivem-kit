@@ -110,6 +110,43 @@ export const REMOTE_SOURCES = {
   },
 };
 
+/**
+ * Headers for a GitHub API request.
+ *
+ * `GITHUB_TOKEN` is used when the environment already has one. Unauthenticated API access is
+ * 60 requests/hour **per IP**, and on shared infrastructure that budget is not ours — a CI
+ * runner shares its address with every other job on the host, so "we only make one request"
+ * says nothing about whether the quota is left. That assumption is what put a 403 in this
+ * project's CI: three matrix jobs, four corpora, one exhausted allowance.
+ *
+ * Authenticated raises it to 1,000/hour for the repository. The variable is read only if it
+ * is already set — nothing here asks anyone to create a token, and the file fetches
+ * themselves go to raw.githubusercontent, which is not rate-limited this way.
+ */
+function githubHeaders() {
+  const headers = { 'user-agent': 'fivem-kit' };
+  const token = process.env.GITHUB_TOKEN;
+  if (token) headers.authorization = `Bearer ${token}`;
+  return headers;
+}
+
+/**
+ * One retry on the two statuses that mean "not now" rather than "no".
+ *
+ * A rate limit is temporary by definition, and failing the whole corpus build over a shared
+ * allowance that refills makes the check flaky — and a flaky check is one people learn to
+ * re-run without reading.
+ */
+async function fetchWithRetry(fetchImpl, url, { attempts = 3 } = {}) {
+  let res;
+  for (let i = 0; i < attempts; i++) {
+    res = await fetchImpl(url, { headers: githubHeaders() });
+    if (res.ok || (res.status !== 403 && res.status !== 429)) return res;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 1000 * (i + 1)));
+  }
+  return res;
+}
+
 /** Fetch with bounded concurrency — 188 files at once would be rude and get us throttled. */
 async function fetchAll(paths, fetchImpl, base, concurrency = 8) {
   const out = new Array(paths.length);
@@ -141,14 +178,21 @@ async function fetchAll(paths, fetchImpl, base, concurrency = 8) {
  * fetched onto the user's own machine at runtime, the same reasoning that keeps the natives
  * database out of the npm package.
  *
- * Enumeration is ONE git-tree request, keeping us clear of the unauthenticated 60/hour API
- * limit; the files themselves come from raw.githubusercontent, which is not subject to it.
+ * Enumeration is ONE git-tree request per corpus; the files themselves come from
+ * raw.githubusercontent, which is not rate-limited the same way. See githubHeaders() for why
+ * one request is not, on its own, enough to stay under the limit.
  */
 function repoCorpus({ repo, branch, prefixes, strip }) {
   return async function build(fetchImpl = fetch) {
     const treeUrl = `https://api.github.com/repos/${repo}/git/trees/${branch}?recursive=1`;
-    const res = await fetchImpl(treeUrl, { headers: { 'user-agent': 'fivem-kit' } });
-    if (!res.ok) throw new Error(`tree listing -> HTTP ${res.status}`);
+    const res = await fetchWithRetry(fetchImpl, treeUrl);
+    if (!res.ok) {
+      throw new Error(
+        res.status === 403 || res.status === 429
+          ? `tree listing -> HTTP ${res.status} (GitHub API rate limit; set GITHUB_TOKEN to raise it)`
+          : `tree listing -> HTTP ${res.status}`
+      );
+    }
     const tree = await res.json();
     if (tree.truncated) throw new Error('tree listing was truncated; refusing a partial corpus');
 

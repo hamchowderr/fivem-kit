@@ -230,3 +230,56 @@ describe('live sources still behave as documented', { skip: !online }, () => {
     }
   });
 });
+
+describe('GitHub API rate limits', () => {
+  /**
+   * A 403 here is "not now", not "no".
+   *
+   * This is what turned CI red on node 24 while 20 and 22 passed — which reads exactly like a
+   * version-specific bug and was nothing of the sort. Unauthenticated GitHub API access is 60
+   * requests/hour PER IP, a runner shares its address with every other job on the host, and
+   * three matrix jobs raced for an allowance that was not theirs to begin with.
+   */
+  const treeUrl = (u) => String(u).includes('api.github.com');
+
+  test('retries through a transient rate limit instead of failing the corpus', async () => {
+    let attempts = 0;
+    const fake = async (url) => {
+      if (!treeUrl(url)) return { ok: true, status: 200, text: async () => '' };
+      attempts++;
+      return attempts <= 2
+        ? { ok: false, status: 403 }
+        : { ok: true, status: 200, json: async () => ({ truncated: false, tree: [] }) };
+    };
+
+    try {
+      await REMOTE_SOURCES.esx.build(fake);
+    } catch {
+      // An empty tree fails later for a different reason; the retry is what is under test.
+    }
+    assert.equal(attempts, 3, 'must retry past a 403 rather than give up on the first one');
+  });
+
+  test('a rate limit that never clears still fails, and says how to fix it', async () => {
+    const fake = async (url) =>
+      treeUrl(url) ? { ok: false, status: 403 } : { ok: true, status: 200, text: async () => '' };
+
+    await assert.rejects(
+      () => REMOTE_SOURCES.esx.build(fake),
+      // Retrying forever would hang a build; the message has to carry the fix instead.
+      /rate limit.*GITHUB_TOKEN/s
+    );
+  });
+
+  test('a 404 is not retried — it is an answer, not a delay', async () => {
+    let attempts = 0;
+    const fake = async (url) => {
+      if (!treeUrl(url)) return { ok: true, status: 200, text: async () => '' };
+      attempts++;
+      return { ok: false, status: 404 };
+    };
+
+    await assert.rejects(() => REMOTE_SOURCES.esx.build(fake));
+    assert.equal(attempts, 1, 'a missing repository must fail immediately');
+  });
+});

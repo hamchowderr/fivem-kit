@@ -36,9 +36,16 @@ jobs:
         working-directory: mcp
         run: npm ci
 
+      # The corpus tests enumerate documentation repositories through the GitHub API.
+      # Unauthenticated that is 60 requests/hour PER IP, and a runner's IP is shared with
+      # every other job on the host — so the quota is not ours and can already be spent.
+      # Three matrix jobs racing for it is what produced a 403 on node 24 while 20 and 22
+      # passed, which reads exactly like a version-specific bug and is not one.
       - name: Test
         working-directory: mcp
         run: npm test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   verify:
     runs-on: ubuntu-latest
