@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose something new — a command, a skill, a security rule
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Please open this and wait for a reply before building it. This repo has strong opinions
+        about what belongs in it, and it's better to find that out before you've written the thing.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you're trying to do, and where fivem-kit gets in the way or falls short.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd build
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which half does this touch?
+      options:
+        - The Claude Code plugin (commands, skills, agents, hooks)
+        - The MCP server (fivem-mcp)
+        - Both
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: rule-kind
+    attributes:
+      label: If this is a security rule, which kind is it?
+      description: >
+        Automatic = decidable from the text of one file. Handed to the model = the answer is
+        elsewhere in the codebase. Knowledge = a judgement applied while reading.
+      options:
+        - Not a security rule
+        - Checked automatically (mcp/src/audit.mjs)
+        - Handed to the model as a review prompt
+        - Documented knowledge (skills/fivem-security)
+        - Not sure

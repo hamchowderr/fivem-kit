@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discord
+    url: https://discord.gg/FVwPAsZZJ
+    about: Questions, setup help, and AI-assisted FiveM development generally.
+  - name: Report a security problem in fivem-kit
+    url: https://github.com/hamchowderr/fivem-kit/security/advisories/new
+    about: Privately, not as a public issue. Exploits in your own resources aren't reported here — that's what the audit is for.

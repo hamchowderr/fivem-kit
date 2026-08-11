@@ -1,0 +1,35 @@
+name: Documentation
+description: Something in the docs is missing, confusing or out of date
+title: "[docs] "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        If a **signature or export is wrong**, use the API correction template instead — those
+        need the upstream source you read it in.
+
+  - type: input
+    id: location
+    attributes:
+      label: Where
+      description: The file, or the section of the README.
+      placeholder: "docs/lsp.md, the 'Why checkThirdParty is Disable' section"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong with it
+      description: Missing, confusing, out of date, or contradicts something else.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you were trying to find out
+      description: >
+        The question you had when you opened the page. This is usually more useful than a
+        suggested rewrite, because it says what the docs should have answered.

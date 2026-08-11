@@ -1,0 +1,103 @@
+name: Bug report
+description: Something in fivem-kit doesn't work
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Before you start
+      options:
+        - label: I searched the existing issues and this isn't already reported
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what happened instead.
+      placeholder: |
+        Expected: /fivem:audit flags the unvalidated price in shop/server.lua
+        Actual: it reports no findings
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: >
+        The smallest resource that shows it — the one event or export that misbehaves, plus the
+        full fxmanifest.lua. See CONTRIBUTING.md for what to include and what to leave out.
+      render: lua
+    validations:
+      required: true
+
+  - type: dropdown
+    id: framework
+    attributes:
+      label: Framework
+      options:
+        - ESX Legacy
+        - QBCore
+        - Qbox
+        - ox (ox_core)
+        - standalone / none
+        - mixed (more than one running)
+    validations:
+      required: true
+
+  - type: input
+    id: framework-version
+    attributes:
+      label: Framework version
+      placeholder: "qb-core 1.3.0"
+
+  - type: input
+    id: kit-version
+    attributes:
+      label: fivem-kit version
+      description: "`npx fivem-mcp --version`, or the plugin version from /plugin"
+      placeholder: "0.2.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: client
+    attributes:
+      label: Where you're running it
+      options:
+        - Claude Code (plugin)
+        - Claude Code (MCP server only)
+        - Cursor
+        - Windsurf
+        - Claude Desktop
+        - VS Code
+        - Zed
+        - Cline
+        - Other MCP client
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Node version and OS
+      placeholder: "Node 22.14.0, Windows 11"
+    validations:
+      required: true
+
+  - type: input
+    id: artifacts
+    attributes:
+      label: FXServer artifact build
+      description: Only if the bug involves a running server.
+      placeholder: "12913"
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Console output
+      description: >
+        The exact lines, including the ones above the error. `couldn't start resource X` is
+        usually the consequence and the cause is two lines up.
+      render: shell

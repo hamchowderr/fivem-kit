@@ -1,0 +1,67 @@
+name: API correction
+description: A documented signature, export or event is wrong
+title: "[api] "
+labels: ["api-correction"]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        A wrong signature is worse than a missing one, so thank you for this. Every field below
+        exists so the correction can be checked — see **Proving a correction** in CONTRIBUTING.md.
+        If you'd rather send a PR directly, please do; it's the same information.
+
+  - type: input
+    id: symbol
+    attributes:
+      label: The symbol
+      placeholder: "exports.ox_inventory:CanCarryItem"
+    validations:
+      required: true
+
+  - type: input
+    id: location
+    attributes:
+      label: Where it's documented
+      description: The file in this repo that has it wrong.
+      placeholder: "skills/ox-stack/references/ox-inventory.md"
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: What the reference currently says
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What the source actually says
+      description: The real signature, and the behaviour if it differs.
+    validations:
+      required: true
+
+  - type: input
+    id: upstream
+    attributes:
+      label: Repository and commit you read
+      description: A tag or commit, not just a version number.
+      placeholder: "overextended/ox_inventory@v2.44.0"
+    validations:
+      required: true
+
+  - type: input
+    id: file
+    attributes:
+      label: File and line in that source
+      placeholder: "modules/inventory/server.lua:812"
+    validations:
+      required: true
+
+  - type: checkboxes
+    attributes:
+      label: Confirmation
+      options:
+        - label: I read the actual source, not the documentation site and not from memory
+          required: true
