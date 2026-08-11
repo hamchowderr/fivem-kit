@@ -17,7 +17,10 @@ on:
 
 permissions:
   contents: write
-  id-token: write # npm provenance — signs the package with a link back to this workflow run
+  # This is now what AUTHENTICATES the publish, not just what signs it. npm mints nothing
+  # long-lived: the runner presents a short-lived OIDC credential and npm checks it against
+  # the trusted publisher registered for the package. Provenance comes along for free.
+  id-token: write
 
 jobs:
   publish:
@@ -86,11 +89,37 @@ jobs:
           fi
           echo "fivem-mcp@$V is not yet published."
 
+      # Trusted publishing needs npm 11.5.1+; the runner's Node 22 ships 10.9.8. Checked here
+      # rather than discovered at `npm publish`, so a version problem reads as a version
+      # problem instead of as an authentication failure.
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@latest
+          NPM_V="$(npm --version)"
+          echo "npm $NPM_V"
+          NPM_V="$NPM_V" node -e '
+            const [maj, min, pat] = process.env.NPM_V.split(".").map(Number);
+            const ok = maj > 11 || (maj === 11 && (min > 5 || (min === 5 && pat >= 1)));
+            if (!ok) {
+              console.error(`npm ${process.env.NPM_V} cannot do trusted publishing — 11.5.1+ required.`);
+              process.exit(1);
+            }
+          '
+
+      # Published with NO token at all.
+      #
+      # `id-token: write` above lets the runner mint a short-lived OIDC credential that npm
+      # verifies against the trusted publisher configured for this package — organisation,
+      # repository and this workflow's filename. Nothing long-lived is stored, so there is no
+      # publish credential in this repository to leak, and the previous failure mode is gone
+      # too: a stored token is subject to the account's 2FA policy, and an OIDC credential is
+      # not, which is why the last attempt died on `npm error code EOTP`.
+      #
+      # --provenance is deliberately absent: trusted publishing generates and publishes the
+      # attestation by itself.
       - name: Publish to npm
         working-directory: mcp
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       # Confirm the registry actually serves what we just sent, rather than trusting exit 0.
       - name: Verify the published package
