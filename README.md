@@ -85,8 +85,8 @@ Give it those, and the same model stops guessing. Concretely, it gains:
   source — 497 of them, checked in CI on every push, including every native name against the
   official natives database — and the official documentation for all five frameworks is
   searchable in-editor.
-- **A security reviewer.** 15 FiveM-specific exploit rules, tuned against 931 real resource
-  files, applied to code as it's written rather than after a server gets drained.
+- **A security reviewer.** 15 FiveM-specific exploit rules, applied to code as it's written
+  rather than after a server gets drained.
 - **Specialists it can delegate to.** Seven subagents, each taking one resource, so auditing or
   migrating a whole server fans out instead of flooding one conversation.
 - **Reflexes.** [16 hooks](docs/hooks.md) that inject your stack at session start, block a
@@ -282,14 +282,8 @@ fivemSearch { "query": "job grade", "source": "qbcore" }
 | `ox` | overextended.dev | 376 KB · 133 pages |
 | `fivem` | Cfx.re server manual + scripting reference — convars, `server.cfg`, OneSync, routing buckets, streaming | 437 KB · 212 pages |
 
-**Every fetch validates on content, never on status.** ESX's documentation site answers HTTP
-200 for *any* path and returns its HTML homepage — 100 KB of it, containing the word `xPlayer`
-once. A fetcher trusting the status code would cache a website's navigation as API reference.
-Validation requires non-HTML, a plausible size, and the marker term appearing often enough to
-be real reference material. A source that fails is never cached and never served.
-
-Corpora are fetched onto your machine and cached for 7 days; none are redistributed, because
-none of the upstream repositories publish a license.
+These are the projects' own docs, fetched to your machine on first use and cached. Nothing is
+redistributed and nothing is scraped into a summary — you get the real pages.
 
 ---
 
@@ -311,32 +305,14 @@ none of the upstream repositories publish a license.
 The analyser decides the mechanical rules itself and returns targeted review prompts for the
 ones that need judgement — it doesn't pad the report with guesses.
 
-**Tuned for precision against real code.** Sweeping 931 resource files from ESX, QBCore, Qbox,
-ox and the qb-scripts collection took the finding count from 79 to 16 by eliminating six
-classes of false positive — `lib.load()` read as `load()`, nested tables truncating a command
-config, an inner `end` cutting a loop scan short, `if source ~= 0` console guards, framework
-command wrappers with their own permission model, and SQL that interpolates a *column or table
-identifier* while still binding its values. What survives is genuine: qb-scripts really do
-still call the deprecated `MySQL.Async` API.
+**It doesn't cry wolf.** The rules were tuned against real servers until what's left is what
+you'd actually fix — an audit you can trust is one you'll run twice.
 
 It knows each framework's spelling of the same dangerous action — ESX's `addAccountMoney`,
 QBCore's `AddMoney`, ox's `:deposit` all count as granting value — so an ungated admin command
 is caught whichever one you use. And a command is only reported when its handler actually
 grants value or control: `/job` printing your own job is not a vulnerability, and reporting it
 would bury the ones that are.
-
-### Findings don't have to scroll away
-
-An audit of a real server turns up more than you'll fix in one sitting, and a list in a chat
-window is gone by tomorrow. So `/fivem:audit` can hand its CRITICAL and HIGH findings to an
-issue tracker instead, one issue each, with the exploit and the fix written out.
-
-Run it again next week and it recognises what it already reported: nothing is duplicated,
-anything you've fixed gets closed, and anything that comes back reopens. You can audit the
-same server every morning and the tracker stays honest.
-
-This uses [beads](https://github.com/steveyegge/beads) if it's installed. It isn't a
-requirement and there's no setup — without it, `/fivem:audit` simply reports as normal.
 
 ---
 
@@ -356,9 +332,8 @@ server RPC equivalent with a different hash — and returns the right one for th
 writing. Where a library wraps a native, it says so, because the wrapper handles the waiting
 and cleanup that hand-written calls skip.
 
-Fetched from the official CitizenFX endpoint on first use and cached for 30 days, not bundled:
-the CitizenFX natives repositories publish no license, and the database tracks game builds so a
-bundled copy goes stale. Set `FIVEM_CACHE_DIR` to control the cache location.
+Fetched from the official CitizenFX endpoint on first use and cached, rather than bundled — so
+it follows game builds instead of going stale. `FIVEM_CACHE_DIR` sets the cache location.
 
 ---
 
@@ -369,9 +344,8 @@ lib, plus per-project switches (`audit_on_write`, `remind_on_stop`, `redact_secr
 `beads`). Add `.claude/*.local.md` to your `.gitignore`; init offers to do it.
 
 Machine-wide preferences — preferred dialect for greenfield work, a default server folder,
-audit-on-write, beads filing — are prompted for when you enable the plugin and live in your
-user settings. Where both set the same thing, the project file wins, because it describes
-*that* server.
+audit-on-write — are prompted for when you enable the plugin and live in your user settings.
+Where both set the same thing, the project file wins, because it describes *that* server.
 
 > **The project file is treated as untrusted input.** It lives in the workspace, so a cloned
 > FiveM repo can ship one and the hooks read it every session. Every value is validated against
