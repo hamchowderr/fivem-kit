@@ -137,11 +137,22 @@ Then `/fivem:init` once per project, so everything speaks your server's dialect.
 
 ### Any MCP client — the server on its own
 
+**Claude Code**
+
 ```bash
-npx -y fivem-mcp
+claude mcp add fivem -- npx -y fivem-mcp@latest
 ```
 
-Add to your MCP config — Cursor, Windsurf, Claude Desktop, VS Code, Zed, Cline:
+Add `--scope user` to make it available in every project rather than just this one.
+
+**Codex**
+
+```bash
+codex mcp add fivem -- npx -y fivem-mcp@latest
+```
+
+**Cursor** — no CLI for this; write `.cursor/mcp.json` in your project, or
+`~/.cursor/mcp.json` for all of them:
 
 ```json
 {
@@ -153,6 +164,12 @@ Add to your MCP config — Cursor, Windsurf, Claude Desktop, VS Code, Zed, Cline
   }
 }
 ```
+
+**Windsurf, Zed, Cline, VS Code, Claude Desktop** take the same JSON — only the file location
+differs, and each one's docs say where.
+
+Check it worked by asking for something only this server knows: *"what does
+`exports.ox_inventory:CanCarryItem` take?"*
 
 ---
 
