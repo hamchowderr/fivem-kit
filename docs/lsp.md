@@ -131,6 +131,9 @@ again weeks later for no visible reason.
 
 ## Verifying it works
 
+<!-- verify-docs: allow SetEntityCoodrs -->
+The misspelling below is deliberate — it is what the diagnostic is supposed to catch.
+
 ```lua
 local ped = PlayerPedId()
 SetEntityCoords(ped, 1.0, 2.0, 3.0, false, false, false, false)

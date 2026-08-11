@@ -125,3 +125,55 @@ bd prime                # Refresh Beads context
 
 **Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
 <!-- END BEADS CODEX SETUP -->
+
+---
+
+# fivem-kit
+
+Two products in one repo: a Claude Code plugin (the root) and the `fivem-mcp` npm package
+(`mcp/`). They ship together and carry the same version.
+
+## Commands
+
+```bash
+cd mcp && npm test                       # the full suite
+node scripts/verify-docs.mjs --strict    # every documented API must exist in real source
+node scripts/update-sources.mjs          # refresh the upstream clones docs are written from
+node scripts/check-release.mjs           # manifests agree with each other and the changelog
+claude plugin validate .claude-plugin/plugin.json
+```
+
+CI runs all of these. `verify-docs` needs the clones — run `update-sources` first.
+
+## The one rule that matters
+
+**Never document an API from memory.** Every symbol in `skills/` is checked against real
+upstream source in CI, and the check exists because it kept catching real mistakes: a QBCore
+reference written against a seven-month-old clone documented a compatibility shim as the
+primary API, and it read perfectly.
+
+So: run `update-sources.mjs`, read the actual source, then write. If `verify-docs` fails, the
+docs are wrong — not the check.
+
+The same applies to the platform. Claim about a Claude Code feature? Grep the binary for its
+zod schema, or load a probe plugin and observe. `.lsp.json` `settings` turned out not to be
+interpolated, which no amount of reading would have revealed — see `docs/lsp.md`.
+
+## Layout
+
+| | |
+|---|---|
+| `skills/` | Knowledge and commands. Every `.md` here is symbol-verified. |
+| `agents/` | Seven subagents, one unit of work each |
+| `hooks/` | One dispatcher, 16 events — `docs/hooks.md` |
+| `scripts/` | Node CLIs the skills call. argv arrays, never shell strings. |
+| `lua/` | Lua definitions shipped to lua-language-server — `docs/lsp.md` |
+| `mcp/` | The npm package. Harness-neutral: no `CLAUDE_*` anywhere in `mcp/src/`. |
+
+## Conventions
+
+- Hooks use exec form (`command` + `args`), never a shell string — the project settings file
+  is untrusted input and must never reach a shell.
+- A check that cannot check must fail, not pass. Verifying nothing is a failure everywhere in
+  this repo, because a green tick nobody investigates is worse than a red one.
+- Ship direct to `main`; there is no PR flow here.

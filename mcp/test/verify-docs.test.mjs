@@ -92,3 +92,25 @@ describe('the verifier refuses to pass without verifying', () => {
     assert.notEqual(r.out.includes("'--strict'"), true, 'the flag must not be read as a path');
   });
 });
+
+describe('coverage and its escape hatch', () => {
+  test('docs/ is scanned, not just skills/', () => {
+    // docs/hooks.md and docs/lsp.md name real APIs, and being the files nobody re-reads is
+    // exactly what lets them rot quietly.
+    const script = fs.readFileSync(SCRIPT, 'utf8');
+    assert.match(script, /path\.join\(REPO, 'docs'\)/);
+  });
+
+  test('a deliberate counter-example can be exempted by name, but never a whole file', () => {
+    const script = fs.readFileSync(SCRIPT, 'utf8');
+    // The marker is per-symbol. A whole-file opt-out would leave every OTHER API in that file
+    // unverified, which is the failure this script exists to prevent.
+    assert.ok(script.includes('verify-docs:'), 'the per-symbol allow marker must be honoured');
+    assert.ok(!/verify-docs:\s*skip/.test(script), 'no whole-file skip may exist');
+
+    // docs/lsp.md relies on it: it shows a misspelled native as the thing a working language
+    // server catches. If that exemption stops being honoured the docs cannot show failure.
+    const lsp = fs.readFileSync(path.join(ROOT, 'docs', 'lsp.md'), 'utf8');
+    assert.match(lsp, /<!--\s*verify-docs:\s*allow\s+SetEntityCoodrs\s*-->/);
+  });
+});

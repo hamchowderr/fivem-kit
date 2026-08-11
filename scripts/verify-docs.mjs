@@ -128,7 +128,7 @@ const readAllTs = (dir) =>
     .join('\n');
 
 /**
- * EVERY markdown file under skills/, concatenated.
+ * EVERY markdown file under skills/ and docs/, concatenated.
  *
  * This deliberately replaces a hardcoded list of reference files. That list covered 10 of 26
  * documents and left 96 API symbols unverified — including migration-map.md, which is the
@@ -136,10 +136,12 @@ const readAllTs = (dir) =>
  * to have wrong. A SKILL.md body makes API claims exactly like a reference file does.
  *
  * Scanning everything means a new document is covered the moment it exists, rather than when
- * someone remembers to add it here.
+ * someone remembers to add it here. `docs/` is included for the same reason: hooks.md and
+ * lsp.md name real APIs, and being the files nobody re-reads is what makes them rot quietly.
  */
+const DOC_DIRS = [path.join(REPO, 'skills'), path.join(REPO, 'docs')];
+
 const allDocs = (() => {
-  const dir = path.join(REPO, 'skills');
   const out = [];
   const walkMd = (d) => {
     let entries = [];
@@ -160,9 +162,31 @@ const allDocs = (() => {
       }
     }
   };
-  walkMd(dir);
+  DOC_DIRS.forEach(walkMd);
   return out.join('\n');
 })();
+
+/**
+ * Symbols a document names ON PURPOSE while being wrong.
+ *
+ * `docs/lsp.md` explains how to tell the language server is working by writing a misspelled
+ * native and expecting a diagnostic. That counter-example is the whole point of the passage,
+ * and a verifier that cannot tell it from a mistake would force the docs to stop showing what
+ * failure looks like.
+ *
+ * The exemption is per-symbol and declared in the file that needs it:
+ *
+ *     <!-- verify-docs: allow SetEntityCoodrs -->
+ *
+ * Deliberately NOT a whole-file skip. A file that opted out entirely would go unverified for
+ * every other API it names, which is the failure this script exists to prevent.
+ */
+const ALLOWED_FICTION = new Set(
+  [...allDocs.matchAll(/<!--\s*verify-docs:\s*allow\s+([^>]+?)\s*-->/g)]
+    .flatMap((m) => m[1].split(','))
+    .map((s) => s.trim())
+    .filter(Boolean)
+);
 
 /** Kept for call-site readability; every target now reads the whole corpus. */
 const doc = () => allDocs;
@@ -170,7 +194,7 @@ const fwDocAll = () => allDocs;
 
 const uniq = (a) => [...new Set(a)].sort();
 const grab = (text, re) => uniq([...text.matchAll(re)].map((m) => m[1]));
-const clean = (list) => list.filter((s) => !NOT_SYMBOLS.has(s));
+const clean = (list) => list.filter((s) => !NOT_SYMBOLS.has(s) && !ALLOWED_FICTION.has(s));
 
 if (!fs.existsSync(OX)) {
   console.error(`ox sources not found at ${OX}`);
@@ -440,6 +464,7 @@ try {
       .filter((n) => /[a-z]/.test(n))
       .filter((n) => !RUNTIME_FUNCTIONS.includes(n))
       .filter((n) => !verifiedElsewhere.has(n))
+      .filter((n) => !ALLOWED_FICTION.has(n))
   );
   targets.push({
     name: 'natives',
