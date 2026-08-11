@@ -238,6 +238,12 @@ of their file reading lands in your main conversation.
 `/fivem:audit` and `/fivem:convert` act as supervisors, batching specialists ~8 per message and
 merging the results.
 
+For a whole-server audit you want to repeat — before a launch, on a schedule, in CI — the
+`fivem-audit-server` workflow does the same job with fixed steps instead of model-directed
+ones, so two runs over the same server do the same work. Findings are re-checked by a second
+pass that tries to disprove them, and anything it couldn't cover is named in the report rather
+than left out.
+
 ### Hooks · Claude Code
 
 **16 events** — session context injection, credential blocking before a write, lint-on-write

@@ -168,6 +168,7 @@ interpolated, which no amount of reading would have revealed — see `docs/lsp.m
 | `hooks/` | One dispatcher, 16 events — `docs/hooks.md` |
 | `scripts/` | Node CLIs the skills call. argv arrays, never shell strings. |
 | `lua/` | Lua definitions shipped to lua-language-server — `docs/lsp.md` |
+| `workflows/` | Deterministic multi-agent runs. Auto-loaded; `.js`, not `.mjs`. No filesystem access. |
 | `mcp/` | The npm package. Harness-neutral: no `CLAUDE_*` anywhere in `mcp/src/`. |
 
 ## Conventions

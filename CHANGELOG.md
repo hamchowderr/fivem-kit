@@ -135,6 +135,24 @@ functionality rather than fixes.
   every manifest in existence. A manifest may still declare arbitrary metadata; anything
   bespoke warns and is silenced with one entry in `Lua.diagnostics.globals`.
 
+- **A deterministic whole-server audit** — `workflows/audit-server.js`. `/fivem:audit` is a
+  supervisor: the model decides how many specialists to spawn and in what order, which is
+  right for a conversation and wrong for a check you run every week, because two runs over the
+  same server can do different amounts of work. The workflow makes the control flow code —
+  survey, audit in bounded batches, then a pass that tries to *refute* each CRITICAL and HIGH
+  finding before it is reported. Resumable, and the same every time.
+
+  It tells you what it did not do: batches that returned nothing are reported as unaudited
+  rather than counted clean, a finding whose verification did not run is kept and marked
+  unverified rather than dropped, and any batching of resources is logged. A partial audit
+  that reads like a complete one is the failure mode that matters in a security tool.
+
+  Plugin `workflows/` directories are auto-loaded, so there is nothing to configure. Contract
+  tests cover the script statically — a fleet of agents is not a cheap thing to run for a
+  regression check, and the ways it can be wrong (a `meta` the loader rejects, `Date.now()`
+  which throws in the sandbox, a phase title that silently drifts from its progress group) are
+  all readable from the source.
+
 - **`docs/hooks.md`** — all 16 hook events with their matchers, the FiveM console-error
   catalogue and what each signature actually means, and how to switch any of them off. They
   were previously documented nowhere.
