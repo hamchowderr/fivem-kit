@@ -4,13 +4,19 @@
  * The thing under test is a CONFIG GENERATOR, and a wrong config here fails the worst way
  * available: lua-language-server starts, reports no error, and simply knows nothing. There is
  * no exception to catch and no red tick. So these assert the shape of what gets written,
- * including the two mistakes that were actually made on the way to it —
+ * including the mistakes actually made on the way to it —
  *
  *   1. putting `${CLAUDE_PLUGIN_DATA}` in `.lsp.json` settings, which Claude Code passes
  *      through verbatim (verified with a probe LSP server), so the server received the literal
  *      string and silently resolved no definitions;
- *   2. overwriting upstream's `Lua.workspace.ignoreDir` instead of merging into it, which
- *      drops `web` — the folder every ox resource keeps its NUI build in.
+ *   2. excluding `fxmanifest.lua` from analysis to silence its warnings, which also silences
+ *      a typo'd `client_scirpts` — a directive that does not error, it just means the script
+ *      never loads;
+ *   3. pointing a library path into the version-pinned plugin directory, which stops existing
+ *      on the next release without lua-language-server ever saying so.
+ *
+ * `.lsp.json` is covered here because `claude plugin validate` does NOT check it — verified by
+ * feeding it a command with spaces and an unknown key and watching validation pass clean.
  */
 
 import { test, describe } from 'node:test';
@@ -135,6 +141,71 @@ describe('the generated .luarc.json', () => {
     assert.match(lib, /ox_lib/);
     assert.match(lib, /ox_core/);
     assert.doesNotMatch(lib, /some_other_resource/, 'only definition-bearing resources belong');
+  });
+});
+
+describe('.lsp.json', () => {
+  /**
+   * `claude plugin validate` does NOT check this file. Verified by putting a command with
+   * spaces and an unknown key in it — both of which Claude Code's own schema rejects — and
+   * watching validation pass clean. So the only thing standing between a typo here and a
+   * silent runtime failure ("Failed to load LSP server configuration", printed where nobody
+   * is looking) is this test.
+   *
+   * The rules are the real ones, read out of the Claude Code binary's zod schema:
+   *
+   *   strictObject({ command: string().min(1).refine(no spaces unless absolute),
+   *                  args?, extensionToLanguage: record (>=1), transport?: 'stdio'|'socket',
+   *                  env?, initializationOptions?, settings?, workspaceFolder?,
+   *                  startupTimeout?, shutdownTimeout?, restartOnCrash?, maxRestarts?,
+   *                  diagnostics? })
+   */
+  const KNOWN_KEYS = new Set([
+    'command', 'args', 'extensionToLanguage', 'transport', 'env', 'initializationOptions',
+    'settings', 'workspaceFolder', 'startupTimeout', 'shutdownTimeout', 'restartOnCrash',
+    'maxRestarts', 'diagnostics',
+  ]);
+
+  const config = JSON.parse(fs.readFileSync(path.join(ROOT, '.lsp.json'), 'utf8'));
+
+  test('declares at least one server, each with the two required fields', () => {
+    const names = Object.keys(config);
+    assert.ok(names.length > 0);
+    for (const name of names) {
+      assert.equal(typeof config[name].command, 'string');
+      assert.ok(config[name].command.length > 0, `${name}: command is required`);
+      const map = config[name].extensionToLanguage;
+      assert.ok(map && Object.keys(map).length > 0, `${name}: extensionToLanguage needs an entry`);
+    }
+  });
+
+  test('uses no key the schema would reject', () => {
+    // The schema is a strictObject, so one unknown key rejects the whole file and the LSP
+    // never starts — for every server in it, not just the one with the typo.
+    for (const [name, server] of Object.entries(config)) {
+      for (const key of Object.keys(server)) {
+        assert.ok(KNOWN_KEYS.has(key), `${name}: "${key}" is not in the schema`);
+      }
+    }
+  });
+
+  test('has no spaces in any command', () => {
+    for (const [name, server] of Object.entries(config)) {
+      assert.ok(
+        !server.command.includes(' ') || server.command.startsWith('/'),
+        `${name}: put arguments in args[], not in the command`
+      );
+    }
+  });
+
+  test('carries no settings, because settings are not interpolated', () => {
+    // The finding that shaped this whole design: `command` and `args` have
+    // ${CLAUDE_PLUGIN_ROOT}/${CLAUDE_PLUGIN_DATA} expanded, `settings` are forwarded verbatim.
+    // A path here would reach lua-language-server as a literal "${...}" string and resolve
+    // nothing, with no error anywhere. Paths belong in .luarc.json.
+    for (const [name, server] of Object.entries(config)) {
+      assert.equal(server.settings, undefined, `${name}: paths belong in .luarc.json`);
+    }
   });
 });
 

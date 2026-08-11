@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Verify that every API symbol fivem-kit documents actually exists in the real source —
- * across the ox stack, es_extended and qb-core.
+ * across the ox stack, oxmysql, es_extended, qb-core and qbx_core, plus every native name
+ * against the official CitizenFX natives database.
  *
  * A wrong signature in a documentation product is worse than a missing one: it sends the
  * reader (or the model) confidently in the wrong direction. ox ships fast, so this check

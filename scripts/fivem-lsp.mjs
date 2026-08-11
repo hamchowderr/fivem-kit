@@ -180,6 +180,10 @@ export function status(projectDir = process.cwd()) {
   // a path that /fivem:doctor calls.
   const server = lslStatus();
   const installed = fs.existsSync(path.join(dir, 'config.json'));
+  // Checked separately from the addon: these are copied out of the plugin rather than cloned,
+  // so they can be absent while the addon is fine — and `ready` claiming true while manifests
+  // warn on every resource is the sort of half-truth this project keeps removing.
+  const defsInstalled = fs.existsSync(path.join(addonsDir(), KIT_LIB, 'fxmanifest.lua'));
   const luarcPath = path.join(projectDir, '.luarc.json');
 
   let luarcState = 'missing';
@@ -196,8 +200,9 @@ export function status(projectDir = process.cwd()) {
   return {
     server,
     addon: { installed, dir },
+    manifestDefs: { installed: defsInstalled, dir: path.join(addonsDir(), KIT_LIB) },
     luarc: { state: luarcState, path: luarcPath },
-    ready: server.installed && installed && luarcState === 'wired',
+    ready: server.installed && installed && defsInstalled && luarcState === 'wired',
   };
 }
 
@@ -259,6 +264,9 @@ function main() {
 
   console.log(`lua-language-server  ${s.server.installed ? s.server.version : 'not on PATH'}`);
   console.log(`type definitions     ${s.addon.installed ? s.addon.dir : 'not installed'}`);
+  console.log(
+    `manifest defs        ${s.manifestDefs.installed ? s.manifestDefs.dir : 'not installed'}`
+  );
   console.log(`.luarc.json          ${s.luarc.state}  (${s.luarc.path})`);
   console.log(
     s.ready
