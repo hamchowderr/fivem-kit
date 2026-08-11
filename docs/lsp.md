@@ -68,28 +68,66 @@ The most important of those settings is `Lua.runtime.nonstandardSymbol`. CfxLua 
 backtick strings and `/* */` comments, none of which are Lua. Without them declared, the server
 reports syntax errors on perfectly valid FiveM code.
 
-## Why manifests are excluded from analysis
+## Manifests: declared, not excluded
 
-`.luarc.json` adds `**/fxmanifest.lua` and `**/__resource.lua` to `Lua.workspace.ignoreDir`.
+A manifest is Lua syntax but not Lua — the server evaluates `fxmanifest.lua` in its own global
+environment, so `fx_version`, `game` and `client_scripts` all read as undefined globals. That is
+three or more warnings on a file every single resource has, which is how diagnostics end up
+switched off entirely.
 
-A manifest is Lua syntax but not Lua — the server evaluates it in its own global environment,
-so `fx_version`, `game` and `client_script` all read as undefined globals. That is three
-warnings on a file every single resource has, which is how diagnostics end up switched off
-entirely.
+The quick fix is to add `**/fxmanifest.lua` to `Lua.workspace.ignoreDir`. It works, and it
+throws away the check most worth having on that file:
 
-The obvious fix — listing the directives in `Lua.diagnostics.globals` — cannot work. A manifest
-may declare **arbitrary** metadata keys, readable at runtime through `GetResourceMetadata`.
-Scanning 76 real manifests across ox, the frameworks and qb-scripts turned up `legacyversion`,
-`chat_theme`, `my_data` and `pizza_topping` sitting alongside the real directives. Any
-enumerated list is incomplete by construction, and would flag someone's own metadata as an
-error.
+```lua
+client_scirpts { 'client.lua' }   -- typo. No error. The script simply never loads.
+```
 
-Nothing is lost. Manifests are already validated by this plugin against the actual manifest
-rules: a `PreToolUse` hook checks one before it is written, and `fivem-manifest-doctor` audits
+A misspelled directive is not a syntax error and does not fail the resource — it means the
+script is silently not there, and the resource then breaks somewhere else entirely. Catching
+that is precisely what this plugin is for, so manifests are **analysed**, and the directives
+are declared in `lua/fxmanifest.lua` instead.
+
+The declarations come from two sources, neither of them guesswork:
+
+1. **citizenfx/fivem-docs**, `scripting-reference/resource-manifest` — the documented set.
+2. **Every directive observed in 75 real `fxmanifest.lua` files** across the ox stack, ESX,
+   QBCore, Qbox and qb-scripts.
+
+The second source is not optional. The plural script forms appear **nowhere** in the official
+reference, and `client_scripts` is used by 58 of those 75 manifests — deriving the list from
+the docs alone would warn on nearly every manifest in existence. `legacyversion`, an ox
+convention used by 33 of them, is undocumented too.
+
+### The residual
+
+A manifest may declare **arbitrary** metadata, readable at runtime via `GetResourceMetadata`.
+Anything bespoke and unlisted is still reported as an undefined global. Measured on a manifest
+using twelve real directives plus one typo and one bespoke key:
+
+| | |
+|---|---|
+| 12 real directives, including `legacyversion` | silent |
+| `client_scirpts` (typo) | **caught** |
+| `pizza_topping` (bespoke metadata) | warns |
+
+That is the right trade — a rare, silenceable warning in exchange for catching a class of bug
+that otherwise costs an afternoon. To silence one, add it to your `.luarc.json`:
+
+```json
+{ "Lua.diagnostics.globals": ["pizza_topping"] }
+```
+
+Manifests are *also* validated properly elsewhere, against the real manifest rules rather than
+Lua's: a `PreToolUse` hook checks one before it is written, and `fivem-manifest-doctor` audits
 them. See [hooks.md](hooks.md).
 
-Note that the merge into `ignoreDir` is a merge, not a replacement — upstream excludes `web`,
-which is where every ox resource keeps its NUI build.
+### Why the definitions are copied
+
+`lua/fxmanifest.lua` is copied into the data directory at setup rather than referenced inside
+the plugin. The plugin directory is version-pinned — `.../cache/fivem/fivem/0.2.0/lua` becomes
+`0.3.0` on the next release — and lua-language-server does **not** complain about a library
+path that has stopped existing. It just quietly stops loading it, and manifests start warning
+again weeks later for no visible reason.
 
 ## Verifying it works
 

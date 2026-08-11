@@ -121,12 +121,19 @@ functionality rather than fixes.
     the addon's `config.json` at setup, so `Lua.runtime.nonstandardSymbol` (CfxLua's `+=` and
     backtick strings, which are not Lua) stays current without an edit here.
 
-  Manifests are excluded from analysis rather than taught: `fxmanifest.lua` is Lua syntax
-  evaluated in its own global environment, so every directive reads as an undefined global —
-  three warnings on a file every resource has. Listing the directives cannot fix it, because a
-  manifest may declare arbitrary metadata keys; 76 real manifests turned up `legacyversion`,
-  `chat_theme` and `pizza_topping` beside the documented ones. They are already validated
-  properly by a `PreToolUse` hook and `fivem-manifest-doctor`.
+  Manifests get their own declarations, in `lua/fxmanifest.lua`. `fxmanifest.lua` is Lua
+  syntax evaluated in its own global environment, so without them every directive reads as an
+  undefined global — three or more warnings on a file every resource has, which is how
+  diagnostics end up switched off entirely. Excluding the file from analysis would silence
+  them and throw away the check most worth having: a typo'd `client_scirpts` does not error,
+  it just means the script never loads, and the resource then breaks somewhere else.
+
+  The directives come from the official manifest reference **and** from every directive
+  observed across 75 real manifests in the ox stack, ESX, QBCore, Qbox and qb-scripts. The
+  second source is not optional — the plural script forms appear nowhere in the reference, and
+  `client_scripts` is used by 58 of those 75, so the documented set alone would warn on almost
+  every manifest in existence. A manifest may still declare arbitrary metadata; anything
+  bespoke warns and is silenced with one entry in `Lua.diagnostics.globals`.
 
 - **`docs/hooks.md`** — all 16 hook events with their matchers, the FiveM console-error
   catalogue and what each signature actually means, and how to switch any of them off. They

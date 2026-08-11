@@ -74,7 +74,7 @@ describe('the generated .luarc.json', () => {
     assert.ok(cfg['Lua.runtime.nonstandardSymbol'].includes('+='));
   });
 
-  test("merges into upstream's ignoreDir instead of replacing it", async () => {
+  test("passes upstream's ignoreDir through, and does NOT exclude manifests", async () => {
     const addons = tmp('ignoredir');
     fakeAddon(addons);
     const { luarc } = await load(addons);
@@ -82,20 +82,29 @@ describe('the generated .luarc.json', () => {
 
     assert.ok(ignore.includes('web'), "upstream's own exclusions must survive");
     assert.ok(ignore.includes('node_modules'));
-    // Manifests are excluded rather than declared: a manifest may define arbitrary metadata
-    // keys, so no list of known globals can ever be complete.
-    assert.ok(ignore.includes('**/fxmanifest.lua'));
-    assert.ok(ignore.includes('**/__resource.lua'));
+
+    // Excluding fxmanifest.lua silences the undefined-global warnings on every manifest, and
+    // throws away the most valuable check available on that file: a typo'd `client_scripts`
+    // does not error, it just means the script never loads. lua/fxmanifest.lua declares the
+    // directives instead, so the typo is caught.
+    assert.ok(
+      !ignore.some((p) => String(p).includes('fxmanifest')),
+      'manifests must be analysed, not excluded'
+    );
   });
 
   test('points the library at the installed definitions with a real absolute path', async () => {
     const addons = tmp('library');
     const addon = fakeAddon(addons);
-    const { luarc } = await load(addons);
+    const { luarc, KIT_LIB } = await load(addons);
     const lib = luarc()['Lua.workspace.library'];
 
-    assert.ok(lib.length >= 1);
+    assert.ok(lib.length >= 2);
     assert.equal(lib[0], path.join(addon, 'library').replace(/\\/g, '/'));
+    // Our own manifest definitions, copied OUT of the plugin: the plugin directory is
+    // version-pinned, so referencing it in place leaves a dead path after the next release —
+    // and lua-language-server ignores a missing library path without complaining.
+    assert.equal(lib[1], path.join(addons, KIT_LIB).replace(/\\/g, '/'));
     // The whole reason this file exists rather than .lsp.json settings.
     assert.ok(
       !JSON.stringify(luarc()).includes('${'),
@@ -126,6 +135,35 @@ describe('the generated .luarc.json', () => {
     assert.match(lib, /ox_lib/);
     assert.match(lib, /ox_core/);
     assert.doesNotMatch(lib, /some_other_resource/, 'only definition-bearing resources belong');
+  });
+});
+
+describe('the manifest definitions', () => {
+  const src = fs.readFileSync(path.join(ROOT, 'lua', 'fxmanifest.lua'), 'utf8');
+  const declared = new Set([...src.matchAll(/^function\s+([a-z_][a-z_0-9]*)\s*\(/gm)].map((m) => m[1]));
+
+  test('declare the directives real manifests actually use', () => {
+    // Every one of these was observed across 75 real fxmanifest.lua files in the ox stack,
+    // ESX, QBCore, Qbox and qb-scripts. The plural script forms are the ones that matter most
+    // and appear NOWHERE in the official reference — client_scripts is in 58 of the 75, so
+    // deriving this list from the docs alone would warn on almost every manifest in existence.
+    for (const d of [
+      'fx_version', 'game', 'lua54',
+      'client_script', 'client_scripts',
+      'server_script', 'server_scripts',
+      'shared_script', 'shared_scripts',
+      'files', 'file', 'ui_page', 'dependency', 'dependencies',
+      'export', 'exports', 'server_export', 'server_exports',
+      'data_file', 'provide', 'escrow_ignore',
+      'name', 'version', 'author', 'description', 'repository', 'license',
+      'legacyversion', 'ox_libs',
+    ]) {
+      assert.ok(declared.has(d), `${d} must be declared or every manifest using it warns`);
+    }
+  });
+
+  test('are a ---@meta file, so they define types without becoming a runtime dependency', () => {
+    assert.match(src, /^---@meta/m);
   });
 });
 

@@ -38,6 +38,12 @@ import { fileURLToPath } from 'node:url';
 
 import { sync as syncRepo } from './update-sources.mjs';
 
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const PLUGIN_ROOT = path.resolve(HERE, '..');
+
+/** Our own definitions, copied next to the upstream ones — see KIT_LIB below. */
+export const KIT_LIB = 'fivem-kit-defs';
+
 export const ADDON_REPO = 'https://github.com/overextended/fivem-lls-addon';
 export const ADDON_NAME = 'fivem-lls-addon';
 
@@ -94,7 +100,8 @@ export function addonSettings(dir = addonPath()) {
 
 /** Resource directories worth putting on the library path, if a server was detected. */
 function libraryPaths(serverPath) {
-  const out = [path.join(addonPath(), 'library')];
+  // Upstream's native definitions, then ours for the manifest directives they do not cover.
+  const out = [path.join(addonPath(), 'library'), path.join(addonsDir(), KIT_LIB)];
   if (!serverPath) return out;
 
   const resources = path.join(serverPath, 'resources');
@@ -124,24 +131,25 @@ function libraryPaths(serverPath) {
 }
 
 /**
- * Manifests are excluded from analysis rather than taught to the language server.
+ * Install our own Lua definitions beside the upstream ones.
  *
- * `fxmanifest.lua` is Lua syntax but not Lua: the server evaluates it in its own global
- * environment, so every directive reads as an undefined global. Three warnings on a file every
- * single resource has is exactly the noise that gets diagnostics switched off wholesale.
- *
- * The obvious fix — declare the directives in `Lua.diagnostics.globals` — cannot work.
- * A manifest may define ARBITRARY metadata keys, readable at runtime via
- * `GetResourceMetadata`. Scanning 76 real manifests across ox, the frameworks and qb-scripts
- * turned up `legacyversion`, `chat_theme`, `my_data` and `pizza_topping` alongside the real
- * directives. Any enumerated list is incomplete by construction and would flag someone's own
- * metadata as an error.
- *
- * Nothing is lost by excluding them: manifests are already validated properly by this plugin —
- * a PreToolUse hook checks one before it is written, and `fivem-manifest-doctor` audits them —
- * against the actual manifest rules rather than Lua's.
+ * They are COPIED out of the plugin rather than referenced in place, because the plugin
+ * directory is version-pinned — `.../plugins/cache/fivem/fivem/0.2.0/lua` becomes `0.3.0` on
+ * the next release and the old path stops existing. lua-language-server does not complain
+ * about a library path that is not there; it just silently stops loading it, and manifests
+ * quietly start warning again weeks later. Copying to the stable data directory means the
+ * path in `.luarc.json` keeps resolving.
  */
-const MANIFEST_FILES = ['**/fxmanifest.lua', '**/__resource.lua'];
+function installKitDefs() {
+  const src = path.join(PLUGIN_ROOT, 'lua');
+  const dest = path.join(addonsDir(), KIT_LIB);
+  if (!fs.existsSync(src)) return { ok: false, dest };
+  fs.mkdirSync(dest, { recursive: true });
+  for (const f of fs.readdirSync(src)) {
+    if (f.endsWith('.lua')) fs.copyFileSync(path.join(src, f), path.join(dest, f));
+  }
+  return { ok: true, dest };
+}
 
 /** Build the .luarc.json contents. Separated from writing so it can be asserted in tests. */
 export function luarc(serverPath) {
@@ -150,13 +158,12 @@ export function luarc(serverPath) {
     $schema: 'https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json',
     // Upstream's settings first, ours second.
     ...upstream,
-    // ignoreDir is the one key both sides set, so it is merged rather than replaced —
-    // overwriting it would silently drop upstream's `web`, and every ox resource keeps its
-    // NUI build there.
-    'Lua.workspace.ignoreDir': [
-      ...(upstream['Lua.workspace.ignoreDir'] || []),
-      ...MANIFEST_FILES,
-    ],
+    // ignoreDir is passed through untouched. It was briefly used to exclude fxmanifest.lua
+    // from analysis, which silenced the undefined-global warnings on every manifest and threw
+    // away the most valuable check available on that file: a typo'd `client_scripts` does not
+    // error, it just means the script never loads. `lua/fxmanifest.lua` declares the
+    // directives instead, so the typo is caught and the real ones get hover and completion.
+    'Lua.workspace.ignoreDir': upstream['Lua.workspace.ignoreDir'] || [],
     'Lua.workspace.library': libraryPaths(serverPath).map((p) => p.replace(/\\/g, '/')),
     // The definitions are loaded directly through workspace.library above, rather than through
     // lua-language-server's third-party addon DETECTION. Detection would need to match
@@ -201,11 +208,12 @@ export function setup({ serverPath, projectDir = process.cwd() } = {}) {
     return { ok: false, step: 'addon', error: result.error };
   }
 
+  const defs = installKitDefs();
   const config = luarc(serverPath);
   const luarcPath = path.join(projectDir, '.luarc.json');
   fs.writeFileSync(luarcPath, `${JSON.stringify(config, null, 2)}\n`, 'utf8');
 
-  return { ok: true, addon: result, luarc: luarcPath, config, server: lslStatus() };
+  return { ok: true, addon: result, defs, luarc: luarcPath, config, server: lslStatus() };
 }
 
 /* ------------------------------------------------------------------ cli ---- */
@@ -228,6 +236,9 @@ function main() {
       process.exit(1);
     }
     console.log(`Type definitions  ${r.addon.action}  ${addonPath()}`);
+    console.log(
+      `Manifest defs     ${r.defs.ok ? 'installed' : 'MISSING from the plugin'}  ${r.defs.dest}`
+    );
     console.log(`Wrote             ${r.luarc}`);
     console.log(
       `                  ${(r.config['Lua.workspace.library'] || []).length} library path(s)`

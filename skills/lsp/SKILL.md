@@ -89,5 +89,9 @@ the undefined global. If nothing appears:
   through `Lua.workspace.library`. The alternative — lua-language-server's addon *detection* —
   ends in a prompt asking whether to apply the addon, and there is nobody to answer a prompt
   in an agent session.
+- **Manifests are analysed, not excluded.** `lua/fxmanifest.lua` declares the directives, so a
+  typo'd `client_scirpts` — which does not error, it just means the script never loads — is
+  caught. A manifest may also declare arbitrary metadata; anything bespoke still warns, and is
+  silenced by adding it to `Lua.diagnostics.globals` in `.luarc.json`. See `docs/lsp.md`.
 - Re-running `setup` is safe. It advances the definitions to the current upstream commit and
   rewrites `.luarc.json`.
