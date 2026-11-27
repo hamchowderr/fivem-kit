@@ -3,5 +3,6 @@
   "backend": "dolt",
   "dolt_mode": "embedded",
   "dolt_database": "fivem_kit",
-  "project_id": "7ef0a5e5-df92-4169-a8e5-881d24986ff2"
+  "project_id": "7ef0a5e5-df92-4169-a8e5-881d24986ff2",
+  "braynee_seen_bd_version": "1.3.0"
 }
